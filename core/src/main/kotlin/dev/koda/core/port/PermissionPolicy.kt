@@ -1,15 +1,14 @@
 package dev.koda.core.port
 
 import dev.koda.core.PermissionMode
-import dev.koda.tools.KodaTool
 
 /**
- * Port deciding whether a tool call needs user approval. Implementations
- * range from mode-based (v0) to rule engines with glob matching (later).
+ * Port deciding whether a tool call needs user approval. Keyed by tool name
+ * and mutation flag so built-in and external (MCP) tools gate identically.
  * One instance per session; grants are session-scoped.
  */
 interface PermissionPolicy {
-    fun needsApproval(tool: KodaTool): Boolean
+    fun needsApproval(toolName: String, mutating: Boolean): Boolean
     fun allowAlways(toolName: String)
 
     /** The user changed the session's permission mode at runtime. */

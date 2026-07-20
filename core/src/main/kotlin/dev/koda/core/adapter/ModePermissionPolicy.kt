@@ -2,7 +2,6 @@ package dev.koda.core.adapter
 
 import dev.koda.core.PermissionMode
 import dev.koda.core.port.PermissionPolicy
-import dev.koda.tools.KodaTool
 
 /** v0 policy: approval by [PermissionMode] plus session-scoped "always allow" grants. */
 class ModePermissionPolicy(initialMode: PermissionMode) : PermissionPolicy {
@@ -10,12 +9,12 @@ class ModePermissionPolicy(initialMode: PermissionMode) : PermissionPolicy {
     private var mode: PermissionMode = initialMode
     private val alwaysAllowed = mutableSetOf<String>()
 
-    override fun needsApproval(tool: KodaTool): Boolean {
-        if (!tool.mutating) return false
-        if (tool.name in alwaysAllowed) return false
+    override fun needsApproval(toolName: String, mutating: Boolean): Boolean {
+        if (!mutating) return false
+        if (toolName in alwaysAllowed) return false
         return when (mode) {
             PermissionMode.YOLO -> false
-            PermissionMode.ACCEPT_EDITS -> tool.name == "bash"
+            PermissionMode.ACCEPT_EDITS -> toolName == "bash"
             PermissionMode.DEFAULT -> true
         }
     }

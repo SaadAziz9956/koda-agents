@@ -21,6 +21,7 @@ import dev.koda.core.ApiShape
 import dev.koda.core.ProviderConfig
 import dev.koda.protocol.CompactSession
 import dev.koda.protocol.Interrupt
+import dev.koda.protocol.Notice
 import dev.koda.protocol.SessionCompacted
 import java.nio.file.Path
 import java.util.UUID
@@ -79,7 +80,7 @@ fun main(args: Array<String>) {
                 runTurn(core, inbox, state, cli.prompt, headless = true)
                 turnActive.set(false)
             } else {
-                println("${BOLD}koda${RESET} ${DIM}v0.3.0 — ${config.model} @ ${provider.name} — session ${state.sessionId}${RESET}")
+                println("${BOLD}koda${RESET} ${DIM}v0.4.0 — ${config.model} @ ${provider.name} — session ${state.sessionId}${RESET}")
                 println("${DIM}Type a message; /help for commands; Ctrl-C interrupts a turn; 'exit' quits.${RESET}")
                 while (true) {
                     val pct = state.contextPercent?.let { "${DIM}[$it%]${RESET} " } ?: ""
@@ -153,6 +154,9 @@ private suspend fun runTurn(
 
             is SessionCompacted ->
                 println("${DIM}(auto-compacted: ${event.tokensBefore} -> ${event.tokensAfter} tokens)${RESET}")
+
+            is Notice ->
+                println("${DIM}${event.text}${RESET}")
 
             is ErrorEvent ->
                 println("\n${RED}error: ${event.message}${RESET}")

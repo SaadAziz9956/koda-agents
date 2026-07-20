@@ -26,10 +26,18 @@ class Handler(BaseHTTPRequestHandler):
         has_tool_result = any(m.get("role") == "tool" for m in messages)
         stream = bool(body.get("stream"))
 
+        wants_echo = any(
+            m.get("role") == "user" and "echo" in str(m.get("content", "")).lower()
+            for m in messages
+        )
+
         if not has_tool_result:
+            if wants_echo:
+                call = {"name": "echo", "arguments": "{\"message\": \"hello from koda\"}"}
+            else:
+                call = {"name": "glob", "arguments": "{\"pattern\": \"**/*.kts\"}"}
             message = {"role": "assistant", "content": None, "tool_calls": [
-                {"id": "call_1", "type": "function",
-                 "function": {"name": "glob", "arguments": "{\"pattern\": \"**/*.kts\"}"}}]}
+                {"id": "call_1", "type": "function", "function": call}]}
             finish = "tool_calls"
         else:
             tool_output = next(m["content"] for m in messages if m.get("role") == "tool")

@@ -5,7 +5,9 @@ import dev.koda.core.PermissionMode
 import dev.koda.protocol.CompactSession
 import dev.koda.protocol.ErrorEvent
 import dev.koda.protocol.Event
+import dev.koda.protocol.ListMcpServers
 import dev.koda.protocol.ListSessions
+import dev.koda.protocol.McpServerList
 import dev.koda.protocol.PermissionModeSetting
 import dev.koda.protocol.SessionCompacted
 import dev.koda.protocol.SessionList
@@ -103,6 +105,18 @@ val COMMANDS: List<CliCommand> = listOf(
         println("  ${DIM}turns:${RESET}   ${state.turnCount}")
         println("  ${DIM}context:${RESET} ${state.lastPromptTokens} tokens$pct")
         println("  ${DIM}mode:${RESET}    ${state.mode.name.lowercase()}")
+    },
+
+    CliCommand("mcp", "/mcp", "List connected MCP servers and their tools") { ctx, _ ->
+        ctx.core.submit(ListMcpServers(UUID.randomUUID().toString(), ctx.state.sessionId))
+        val list = ctx.inbox.awaitFirst<McpServerList>() ?: return@CliCommand
+        if (list.servers.isEmpty()) {
+            println("${DIM}no MCP servers connected — configure them in ~/.koda/mcp.json or .koda/mcp.json${RESET}")
+        } else {
+            list.servers.forEach { server ->
+                println("  ${BOLD}${server.name}${RESET}  ${DIM}${server.toolNames.size} tools: ${server.toolNames.joinToString(", ").take(160)}${RESET}")
+            }
+        }
     },
 
     CliCommand("yolo", "/yolo", "Toggle approval-free mode for this session") { ctx, _ ->

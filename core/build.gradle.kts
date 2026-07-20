@@ -11,6 +11,7 @@ dependencies {
     api(project(":protocol"))
     api(project(":tools"))
     api(libs.koog.agents)
+    api(libs.koog.agents.mcp)
     api(libs.coroutines.core)
     implementation(libs.serialization.json)
 }

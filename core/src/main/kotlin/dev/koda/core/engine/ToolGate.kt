@@ -18,40 +18,67 @@ fun interface EventSink {
 }
 
 /**
- * The permission gate in front of every tool dispatch. Koog invokes the
- * bridged tools; the bridged tools invoke this; this consults the session's
- * [dev.koda.core.port.PermissionPolicy], runs the approval handshake when
- * needed, emits ToolBegin/ToolEnd, and only then runs the domain tool.
+ * The permission gate in front of every tool dispatch — built-in and
+ * external (MCP) alike. Koog invokes the bridged tools; the bridged tools
+ * invoke this; this consults the session's permission policy, runs the
+ * approval handshake when needed, emits ToolBegin/ToolEnd, and only then
+ * executes.
  */
 class ToolGate(
     private val session: AgentSession,
     private val events: EventSink,
 ) {
-    suspend fun run(tool: KodaTool, args: JsonObject): String {
-        if (session.permissions.needsApproval(tool)) {
+    /** Dispatch a built-in Koda domain tool. */
+    suspend fun run(tool: KodaTool, args: JsonObject): String =
+        gated(tool.name, mutating = tool.mutating, summary = tool.summarize(args), argsText = args.toString()) {
+            val result = try {
+                tool.execute(args, session.toolContext)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ToolResult.error("Tool ${tool.name} failed: ${e.message ?: e.toString()}")
+            }
+            result
+        }
+
+    /**
+     * Dispatch an external (MCP) tool. External tools are conservatively
+     * treated as mutating — a remote server can do anything.
+     */
+    suspend fun runExternal(toolName: String, argsText: String, execute: suspend () -> String): String =
+        gated(toolName, mutating = true, summary = "$toolName ${argsText.take(120)}", argsText = argsText) {
+            try {
+                ToolResult(execute())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ToolResult.error("Tool $toolName failed: ${e.message ?: e.toString()}")
+            }
+        }
+
+    private suspend fun gated(
+        toolName: String,
+        mutating: Boolean,
+        summary: String,
+        argsText: String,
+        execute: suspend () -> ToolResult,
+    ): String {
+        if (session.permissions.needsApproval(toolName, mutating)) {
             val approvalId = UUID.randomUUID().toString()
-            events.emit(
-                ApprovalRequest(session.id, approvalId, tool.name, tool.summarize(args), args.toString())
-            )
+            events.emit(ApprovalRequest(session.id, approvalId, toolName, summary, argsText))
             when (session.approvals.await(approvalId)) {
                 ApprovalDecision.DENY ->
                     return "DENIED: the user denied this tool call. Ask before retrying it."
-                ApprovalDecision.APPROVE_ALWAYS -> session.permissions.allowAlways(tool.name)
+                ApprovalDecision.APPROVE_ALWAYS -> session.permissions.allowAlways(toolName)
                 ApprovalDecision.APPROVE -> {}
             }
         }
 
         val callId = UUID.randomUUID().toString()
-        events.emit(ToolBegin(session.id, session.currentTurnId, callId, tool.name, args.toString()))
-        val result = try {
-            tool.execute(args, session.toolContext)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            ToolResult.error("Tool ${tool.name} failed: ${e.message ?: e.toString()}")
-        }
+        events.emit(ToolBegin(session.id, session.currentTurnId, callId, toolName, argsText))
+        val result = execute()
         events.emit(
-            ToolEnd(session.id, session.currentTurnId, callId, tool.name, result.output, result.isError)
+            ToolEnd(session.id, session.currentTurnId, callId, toolName, result.output, result.isError)
         )
         return if (result.isError) "ERROR: ${result.output}" else result.output
     }

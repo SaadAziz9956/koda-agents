@@ -71,6 +71,14 @@ data class ListSessions(
     override val sessionId: String,
 ) : Submission
 
+/** Ask the core for connected MCP servers. Answered with [McpServerList]. */
+@Serializable
+@SerialName("list_mcp_servers")
+data class ListMcpServers(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 /** Change the permission mode of a running session. */
 @Serializable
 @SerialName("set_permission_mode")
@@ -128,6 +136,28 @@ data class SessionSummary(
     val updatedAtEpochMs: Long,
     val messageCount: Int,
 )
+
+/** Answer to [ListMcpServers]. */
+@Serializable
+@SerialName("mcp_server_list")
+data class McpServerList(
+    override val sessionId: String,
+    val servers: List<McpServerSummary>,
+) : Event
+
+@Serializable
+data class McpServerSummary(
+    val name: String,
+    val toolNames: List<String>,
+)
+
+/** Informational message from the core (startup notices, MCP connect results). */
+@Serializable
+@SerialName("notice")
+data class Notice(
+    override val sessionId: String,
+    val text: String,
+) : Event
 
 @Serializable
 @SerialName("turn_started")

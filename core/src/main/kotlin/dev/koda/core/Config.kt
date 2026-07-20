@@ -30,7 +30,8 @@ data class KodaConfig(
     val permissionMode: PermissionMode = PermissionMode.DEFAULT,
     val maxIterationsPerTurn: Int = 50,
     val maxTokens: Int = 8192,
-    val kodaHome: Path = Path.of(System.getProperty("user.home"), ".koda"),
+    val kodaHome: Path = System.getenv("KODA_HOME")?.let(Path::of)
+        ?: Path.of(System.getProperty("user.home"), ".koda"),
 ) {
     val sessionsDir: Path get() = kodaHome.resolve("sessions")
 }

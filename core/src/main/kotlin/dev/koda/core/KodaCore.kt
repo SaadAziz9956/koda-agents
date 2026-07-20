@@ -14,7 +14,10 @@ import ai.koog.prompt.llm.LLModel
 import dev.koda.core.adapter.ModePermissionPolicy
 import dev.koda.core.adapter.PromptFileSessionRepository
 import dev.koda.core.engine.KoogEngine
+import dev.koda.core.engine.McpConnection
+import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
+import dev.koda.core.engine.gatedMcpRegistry
 import dev.koda.core.engine.kodaToolRegistry
 import dev.koda.core.port.PermissionPolicy
 import dev.koda.core.port.SessionRepository
@@ -22,7 +25,11 @@ import dev.koda.protocol.ApprovalResponse
 import dev.koda.protocol.CompactSession
 import dev.koda.protocol.Event
 import dev.koda.protocol.Interrupt
+import dev.koda.protocol.ListMcpServers
 import dev.koda.protocol.ListSessions
+import dev.koda.protocol.McpServerList
+import dev.koda.protocol.McpServerSummary
+import dev.koda.protocol.Notice
 import dev.koda.protocol.PermissionModeSetting
 import dev.koda.protocol.SessionList
 import dev.koda.protocol.SessionStarted
@@ -69,9 +76,12 @@ class KodaCore(
         maxIterationsPerTurn = config.maxIterationsPerTurn,
     )
 
+    private val mcpConnections = mutableListOf<McpConnection>()
+
     val events: SharedFlow<Event> get() = _events
 
     fun start(): Job = scope.launch {
+        connectMcpServers()
         for (submission in submissions) {
             when (submission) {
                 is UserTurn -> runtimeFor(submission.sessionId).enqueue(SessionWork.Turn(submission.text))
@@ -84,6 +94,12 @@ class KodaCore(
                     SessionList(
                         submission.sessionId,
                         repository.list().map { SessionSummary(it.id, it.updatedAtEpochMs, it.messageCount) },
+                    )
+                )
+                is ListMcpServers -> _events.emit(
+                    McpServerList(
+                        submission.sessionId,
+                        mcpConnections.map { McpServerSummary(it.name, it.toolNames) },
                     )
                 )
                 is SetPermissionMode ->
@@ -99,6 +115,21 @@ class KodaCore(
     }
 
     suspend fun submit(submission: Submission) = submissions.send(submission)
+
+    /** Connect configured MCP servers before processing any submissions. */
+    private suspend fun connectMcpServers() {
+        McpConnector.loadSpecs(config.kodaHome, config.cwd).forEach { (name, spec) ->
+            try {
+                val connection = McpConnector.connect(name, spec)
+                mcpConnections += connection
+                _events.emit(
+                    Notice("", "mcp: connected '$name' (${connection.toolNames.size} tools)")
+                )
+            } catch (e: Exception) {
+                _events.emit(Notice("", "mcp: failed to connect '$name': ${e.message ?: e}"))
+            }
+        }
+    }
 
     override fun close() {
         scope.cancel()
@@ -136,7 +167,7 @@ class KodaCore(
     /** Orchestrates one session: serializes its work items, owns interrupt. */
     private inner class SessionRuntime(val session: AgentSession) {
         private val gate = ToolGate(session) { _events.emit(it) }
-        private val registry = kodaToolRegistry(gate)
+        private val registry = kodaToolRegistry(gate) + gatedMcpRegistry(mcpConnections, gate)
         private val workQueue = Channel<SessionWork>(Channel.UNLIMITED)
         @Volatile private var currentWork: Job? = null
 
