@@ -1,0 +1,72 @@
+# Koda — Design Constitution
+
+Koda is a personal autonomous agent harness in Kotlin: Hermes-shaped identity
+(multi-surface personal agent), Codex-shaped architecture (core + typed
+protocol, every surface a thin client), Claude-Code-shaped tool semantics
+(exact-string Edit, read-before-edit, permission gate in front of dispatch).
+
+## Design laws
+
+These are ordered. When they conflict, the lower number wins.
+
+1. **The protocol is the only boundary.** Surfaces (CLI, TUI, gateway,
+   desktop, SDK) speak `Submission` in and `Event` out — nothing else.
+   No surface may import `core` internals beyond constructing `KodaCore`.
+   If a feature needs a new capability at the boundary, it gets a new
+   protocol type, never a side channel.
+
+2. **Prompt caching is sacred.** The system prompt is assembled once per
+   session and stays byte-stable for the session's life. The conversation
+   is append-only; nothing mutates past messages except explicit
+   compaction (which splits the session). Any feature that would rewrite
+   earlier context is designed around instead.
+
+3. **Tools are dumb, the core is smart.** Tool handlers take JSON args and
+   return strings. They never talk to the user, never render, never ask
+   for permission — approval, display, and policy all live in the core,
+   in front of dispatch.
+
+4. **Narrow waist.** Every core tool schema ships on every LLM call, so new
+   core tools are a last resort. Extend Koda in this order: prompt/skill →
+   config → plugin (future) → MCP server (future) → core tool.
+
+5. **The permission gate is honest.** Mutating tools ask unless the user
+   opted out. Deny always wins. Nothing the model outputs can widen its
+   own permissions.
+
+6. **Kotlin-native stack only.** kotlinx.coroutines, kotlinx.serialization,
+   Ktor. No Java frameworks, no reflection-based DI containers, no
+   annotation processors. A new dependency needs a reason the kotlinx
+   ecosystem can't provide.
+
+7. **Ports and adapters, dependencies point inward.** The core depends on
+   interfaces (`core/port/*`); implementations live in `core/adapter/*`
+   (or their own modules) and are injected at a composition root
+   (`KodaCore.create`, or the surface's main). No class constructs its own
+   collaborators. Use cases (`AgentLoop`) are classes with injected
+   dependencies, testable without I/O. State (`AgentSession`) is separated
+   from orchestration (`SessionRuntime`) and from policy (ports).
+
+## Module map
+
+- `protocol` — wire types (`Submission`/`Event`), kotlinx.serialization. Zero deps beyond serialization.
+- `providers` — normalized `ChatMessage`/`LlmRequest` model + one transport per API *shape*: `AnthropicTransport` (Messages API), `OpenAiTransport` (Chat Completions — covers all OpenAI-compatible hosts).
+- `tools` — `KodaTool` interface + registry + core toolset: read, write, edit, bash, grep, glob, todo.
+- `core` — the use-case layer. `AgentLoop` (the loop), `AgentSession` (state), `ApprovalBroker` (approval handshake), `KodaCore` (facade + `SessionRuntime` orchestration), `core/port/*` (SessionRepository, PermissionPolicy), `core/adapter/*` (JSONL repository, mode-based policy).
+- `cli` — interactive terminal client + `-p` headless mode. Runs the core in-process, through the protocol boundary only.
+- `daemon` — the same core served over WebSocket (`ws://127.0.0.1:4477/ws`) for future surfaces.
+
+## Conventions
+
+- Kotlin official style; JVM toolchain 21.
+- Provider adapters normalize *everything* — no vendor types escape `providers`.
+- Tool results are what the model sees: plain strings, truncated with an
+  explicit marker when capped.
+- Build: `./gradlew build`. Run: `./gradlew :cli:run -q --console=plain`.
+
+## Roadmap (post-v0)
+
+Interrupt key handling (Esc) → compaction → session browser/resume UX →
+TUI (Mosaic or JLine) → MCP client → skills (SKILL.md standard) → hooks →
+subagents → sandboxing (`sandbox-exec`/`bwrap` shell-out) → gateway surfaces →
+the learning loop (memory files, background review, skill creation).
