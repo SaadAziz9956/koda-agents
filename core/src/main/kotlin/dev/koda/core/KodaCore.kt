@@ -17,6 +17,7 @@ import dev.koda.core.engine.kodaToolRegistry
 import dev.koda.core.port.PermissionPolicy
 import dev.koda.core.port.SessionRepository
 import dev.koda.protocol.ApprovalResponse
+import dev.koda.protocol.CompactSession
 import dev.koda.protocol.Event
 import dev.koda.protocol.Interrupt
 import dev.koda.protocol.SessionStarted
@@ -66,7 +67,8 @@ class KodaCore(
     fun start(): Job = scope.launch {
         for (submission in submissions) {
             when (submission) {
-                is UserTurn -> runtimeFor(submission.sessionId).enqueue(submission.text)
+                is UserTurn -> runtimeFor(submission.sessionId).enqueue(SessionWork.Turn(submission.text))
+                is CompactSession -> runtimeFor(submission.sessionId).enqueue(SessionWork.Compact)
                 is Interrupt -> sessions[submission.sessionId]?.interrupt()
                 is ApprovalResponse ->
                     sessions[submission.sessionId]
@@ -97,29 +99,39 @@ class KodaCore(
         return runtime
     }
 
-    /** Orchestrates one session: serializes its turns, owns interrupt. */
+    private sealed interface SessionWork {
+        data class Turn(val text: String) : SessionWork
+        data object Compact : SessionWork
+    }
+
+    /** Orchestrates one session: serializes its work items, owns interrupt. */
     private inner class SessionRuntime(val session: AgentSession) {
         private val gate = ToolGate(session) { _events.emit(it) }
         private val registry = kodaToolRegistry(gate)
-        private val turnQueue = Channel<String>(Channel.UNLIMITED)
-        @Volatile private var currentTurn: Job? = null
+        private val workQueue = Channel<SessionWork>(Channel.UNLIMITED)
+        @Volatile private var currentWork: Job? = null
 
         init {
             scope.launch {
-                for (text in turnQueue) {
-                    val job = scope.launch { engine.runTurn(session, registry, text) }
-                    currentTurn = job
+                for (work in workQueue) {
+                    val job = scope.launch {
+                        when (work) {
+                            is SessionWork.Turn -> engine.runTurn(session, registry, work.text)
+                            is SessionWork.Compact -> engine.compact(session, registry)
+                        }
+                    }
+                    currentWork = job
                     job.join()
-                    currentTurn = null
+                    currentWork = null
                 }
             }
         }
 
-        suspend fun enqueue(text: String) = turnQueue.send(text)
+        suspend fun enqueue(work: SessionWork) = workQueue.send(work)
 
         fun interrupt() {
             session.approvals.cancelAll()
-            currentTurn?.cancel()
+            currentWork?.cancel()
         }
     }
 

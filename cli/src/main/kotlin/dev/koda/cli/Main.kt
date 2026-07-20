@@ -19,13 +19,18 @@ import dev.koda.protocol.TurnStopReason
 import dev.koda.protocol.UserTurn
 import dev.koda.core.ApiShape
 import dev.koda.core.ProviderConfig
+import dev.koda.protocol.CompactSession
+import dev.koda.protocol.Interrupt
+import dev.koda.protocol.SessionCompacted
 import java.nio.file.Path
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import sun.misc.Signal
 
 private const val DIM = "\u001B[2m"
 private const val BOLD = "\u001B[1m"
@@ -53,23 +58,60 @@ fun main(args: Array<String>) {
 
             val sessionId = cli.session ?: UUID.randomUUID().toString().take(8)
 
+            // First Ctrl-C interrupts a running turn; when idle it exits.
+            val turnActive = AtomicBoolean(false)
+            Signal.handle(Signal("INT")) {
+                if (turnActive.get()) {
+                    runBlocking {
+                        core.submit(Interrupt(UUID.randomUUID().toString(), sessionId))
+                    }
+                } else {
+                    kotlin.system.exitProcess(130)
+                }
+            }
+
             if (cli.prompt != null) {
+                turnActive.set(true)
                 runTurn(core, inbox, sessionId, cli.prompt, headless = true)
+                turnActive.set(false)
             } else {
-                println("${BOLD}koda${RESET} ${DIM}v0.1.0 — ${config.model} @ ${provider.name} — session $sessionId${RESET}")
-                println("${DIM}Type a message, or 'exit' to quit.${RESET}")
+                println("${BOLD}koda${RESET} ${DIM}v0.2.0 — ${config.model} @ ${provider.name} — session $sessionId${RESET}")
+                println("${DIM}Type a message; /compact to compress history; Ctrl-C interrupts a turn; 'exit' quits.${RESET}")
                 while (true) {
                     print("\n${BOLD}${CYAN}❯${RESET} ")
                     System.out.flush()
                     val line = readlnOrNull()?.trim() ?: break
                     if (line.isEmpty()) continue
                     if (line == "exit" || line == "/quit" || line == "/exit") break
+                    if (line == "/compact") {
+                        runCompact(core, inbox, sessionId)
+                        continue
+                    }
+                    turnActive.set(true)
                     runTurn(core, inbox, sessionId, line, headless = false)
+                    turnActive.set(false)
                 }
             }
 
             collector.cancel()
             coreJob.cancel()
+        }
+    }
+}
+
+private suspend fun runCompact(core: KodaCore, inbox: Channel<Event>, sessionId: String) {
+    core.submit(CompactSession(UUID.randomUUID().toString(), sessionId))
+    while (true) {
+        when (val event = inbox.receive()) {
+            is SessionCompacted -> {
+                println("${DIM}compacted: ${event.tokensBefore} -> ${event.tokensAfter} tokens${RESET}")
+                return
+            }
+            is ErrorEvent -> {
+                println("${RED}error: ${event.message}${RESET}")
+                return
+            }
+            else -> {} // drain unrelated events
         }
     }
 }
@@ -120,6 +162,9 @@ private suspend fun runTurn(
             }
 
             is TokenUsage -> {}
+
+            is SessionCompacted ->
+                println("${DIM}(auto-compacted: ${event.tokensBefore} -> ${event.tokensAfter} tokens)${RESET}")
 
             is ErrorEvent ->
                 println("\n${RED}error: ${event.message}${RESET}")

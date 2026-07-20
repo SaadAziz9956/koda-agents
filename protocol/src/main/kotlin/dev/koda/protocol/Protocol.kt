@@ -55,6 +55,14 @@ data class ApprovalResponse(
     val decision: ApprovalDecision,
 ) : Submission
 
+/** Compress the session's conversation history into a summary. */
+@Serializable
+@SerialName("compact_session")
+data class CompactSession(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 @Serializable
 enum class ApprovalDecision {
     @SerialName("approve") APPROVE,
@@ -174,6 +182,15 @@ enum class TurnStopReason {
     @SerialName("max_iterations") MAX_ITERATIONS,
     @SerialName("error") ERROR,
 }
+
+/** History compression finished (manual /compact or automatic). */
+@Serializable
+@SerialName("session_compacted")
+data class SessionCompacted(
+    override val sessionId: String,
+    val tokensBefore: Long,
+    val tokensAfter: Long,
+) : Event
 
 @Serializable
 @SerialName("error")
