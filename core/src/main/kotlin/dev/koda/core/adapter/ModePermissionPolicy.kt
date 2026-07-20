@@ -5,7 +5,9 @@ import dev.koda.core.port.PermissionPolicy
 import dev.koda.tools.KodaTool
 
 /** v0 policy: approval by [PermissionMode] plus session-scoped "always allow" grants. */
-class ModePermissionPolicy(private val mode: PermissionMode) : PermissionPolicy {
+class ModePermissionPolicy(initialMode: PermissionMode) : PermissionPolicy {
+    @Volatile
+    private var mode: PermissionMode = initialMode
     private val alwaysAllowed = mutableSetOf<String>()
 
     override fun needsApproval(tool: KodaTool): Boolean {
@@ -20,5 +22,9 @@ class ModePermissionPolicy(private val mode: PermissionMode) : PermissionPolicy 
 
     override fun allowAlways(toolName: String) {
         alwaysAllowed += toolName
+    }
+
+    override fun updateMode(mode: PermissionMode) {
+        this.mode = mode
     }
 }

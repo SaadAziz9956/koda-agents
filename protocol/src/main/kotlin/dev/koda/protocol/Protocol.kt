@@ -63,6 +63,30 @@ data class CompactSession(
     override val sessionId: String,
 ) : Submission
 
+/** Ask the core for the list of persisted sessions. Answered with [SessionList]. */
+@Serializable
+@SerialName("list_sessions")
+data class ListSessions(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
+/** Change the permission mode of a running session. */
+@Serializable
+@SerialName("set_permission_mode")
+data class SetPermissionMode(
+    override val id: String,
+    override val sessionId: String,
+    val mode: PermissionModeSetting,
+) : Submission
+
+@Serializable
+enum class PermissionModeSetting {
+    @SerialName("default") DEFAULT,
+    @SerialName("accept_edits") ACCEPT_EDITS,
+    @SerialName("yolo") YOLO,
+}
+
 @Serializable
 enum class ApprovalDecision {
     @SerialName("approve") APPROVE,
@@ -86,7 +110,24 @@ data class SessionStarted(
     val model: String,
     val provider: String,
     val cwd: String,
+    /** Model context window in tokens; 0 when unknown. */
+    val contextLength: Long = 0,
 ) : Event
+
+/** Answer to [ListSessions]. */
+@Serializable
+@SerialName("session_list")
+data class SessionList(
+    override val sessionId: String,
+    val sessions: List<SessionSummary>,
+) : Event
+
+@Serializable
+data class SessionSummary(
+    val id: String,
+    val updatedAtEpochMs: Long,
+    val messageCount: Int,
+)
 
 @Serializable
 @SerialName("turn_started")

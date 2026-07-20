@@ -1,5 +1,6 @@
 package dev.koda.core.port
 
+import dev.koda.core.PermissionMode
 import dev.koda.tools.KodaTool
 
 /**
@@ -10,4 +11,7 @@ import dev.koda.tools.KodaTool
 interface PermissionPolicy {
     fun needsApproval(tool: KodaTool): Boolean
     fun allowAlways(toolName: String)
+
+    /** The user changed the session's permission mode at runtime. */
+    fun updateMode(mode: PermissionMode)
 }

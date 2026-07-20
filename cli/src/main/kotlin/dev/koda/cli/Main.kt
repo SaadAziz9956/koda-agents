@@ -32,12 +32,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import sun.misc.Signal
 
-private const val DIM = "\u001B[2m"
-private const val BOLD = "\u001B[1m"
-private const val CYAN = "\u001B[36m"
-private const val YELLOW = "\u001B[33m"
-private const val RED = "\u001B[31m"
-private const val RESET = "\u001B[0m"
+internal const val DIM = "\u001B[2m"
+internal const val BOLD = "\u001B[1m"
+internal const val CYAN = "\u001B[36m"
+internal const val YELLOW = "\u001B[33m"
+internal const val RED = "\u001B[31m"
+internal const val RESET = "\u001B[0m"
 
 fun main(args: Array<String>) {
     val cli = CliArgs.parse(args)
@@ -56,14 +56,18 @@ fun main(args: Array<String>) {
             val inbox = Channel<Event>(Channel.UNLIMITED)
             val collector = launch { core.events.collect { inbox.send(it) } }
 
-            val sessionId = cli.session ?: UUID.randomUUID().toString().take(8)
+            val state = CliState(
+                sessionId = cli.session ?: UUID.randomUUID().toString().take(8),
+                mode = cli.permissionMode,
+            )
+            val commandContext = CommandContext(core, inbox, state)
 
             // First Ctrl-C interrupts a running turn; when idle it exits.
             val turnActive = AtomicBoolean(false)
             Signal.handle(Signal("INT")) {
                 if (turnActive.get()) {
                     runBlocking {
-                        core.submit(Interrupt(UUID.randomUUID().toString(), sessionId))
+                        core.submit(Interrupt(UUID.randomUUID().toString(), state.sessionId))
                     }
                 } else {
                     kotlin.system.exitProcess(130)
@@ -72,23 +76,21 @@ fun main(args: Array<String>) {
 
             if (cli.prompt != null) {
                 turnActive.set(true)
-                runTurn(core, inbox, sessionId, cli.prompt, headless = true)
+                runTurn(core, inbox, state, cli.prompt, headless = true)
                 turnActive.set(false)
             } else {
-                println("${BOLD}koda${RESET} ${DIM}v0.2.0 — ${config.model} @ ${provider.name} — session $sessionId${RESET}")
-                println("${DIM}Type a message; /compact to compress history; Ctrl-C interrupts a turn; 'exit' quits.${RESET}")
+                println("${BOLD}koda${RESET} ${DIM}v0.3.0 — ${config.model} @ ${provider.name} — session ${state.sessionId}${RESET}")
+                println("${DIM}Type a message; /help for commands; Ctrl-C interrupts a turn; 'exit' quits.${RESET}")
                 while (true) {
-                    print("\n${BOLD}${CYAN}❯${RESET} ")
+                    val pct = state.contextPercent?.let { "${DIM}[$it%]${RESET} " } ?: ""
+                    print("\n$pct${BOLD}${CYAN}❯${RESET} ")
                     System.out.flush()
                     val line = readlnOrNull()?.trim() ?: break
                     if (line.isEmpty()) continue
                     if (line == "exit" || line == "/quit" || line == "/exit") break
-                    if (line == "/compact") {
-                        runCompact(core, inbox, sessionId)
-                        continue
-                    }
+                    if (dispatchCommand(line, commandContext)) continue
                     turnActive.set(true)
-                    runTurn(core, inbox, sessionId, line, headless = false)
+                    runTurn(core, inbox, state, line, headless = false)
                     turnActive.set(false)
                 }
             }
@@ -99,36 +101,21 @@ fun main(args: Array<String>) {
     }
 }
 
-private suspend fun runCompact(core: KodaCore, inbox: Channel<Event>, sessionId: String) {
-    core.submit(CompactSession(UUID.randomUUID().toString(), sessionId))
-    while (true) {
-        when (val event = inbox.receive()) {
-            is SessionCompacted -> {
-                println("${DIM}compacted: ${event.tokensBefore} -> ${event.tokensAfter} tokens${RESET}")
-                return
-            }
-            is ErrorEvent -> {
-                println("${RED}error: ${event.message}${RESET}")
-                return
-            }
-            else -> {} // drain unrelated events
-        }
-    }
-}
-
 private suspend fun runTurn(
     core: KodaCore,
     inbox: Channel<Event>,
-    sessionId: String,
+    state: CliState,
     text: String,
     headless: Boolean,
 ) {
+    val sessionId = state.sessionId
     core.submit(UserTurn(UUID.randomUUID().toString(), sessionId, text))
     var streamedAnything = false
 
     while (true) {
         when (val event = inbox.receive()) {
-            is SessionStarted -> {}
+            is SessionStarted ->
+                if (event.sessionId == sessionId) state.contextLength = event.contextLength
 
             is TextDelta -> {
                 if (event.sessionId == sessionId) {
@@ -161,7 +148,8 @@ private suspend fun runTurn(
                 )
             }
 
-            is TokenUsage -> {}
+            is TokenUsage ->
+                if (event.sessionId == sessionId) state.lastPromptTokens = event.inputTokens
 
             is SessionCompacted ->
                 println("${DIM}(auto-compacted: ${event.tokensBefore} -> ${event.tokensAfter} tokens)${RESET}")
@@ -171,6 +159,7 @@ private suspend fun runTurn(
 
             is TurnCompleted -> {
                 if (streamedAnything) println()
+                state.turnCount++
                 when (event.stopReason) {
                     TurnStopReason.MAX_ITERATIONS ->
                         println("${YELLOW}(stopped: hit max iterations for this turn)${RESET}")

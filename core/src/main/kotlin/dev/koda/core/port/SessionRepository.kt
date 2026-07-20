@@ -10,4 +10,13 @@ import ai.koog.prompt.Prompt
 interface SessionRepository {
     fun save(sessionId: String, prompt: Prompt)
     fun load(sessionId: String): Prompt?
+
+    /** All persisted sessions, most recently updated first. */
+    fun list(): List<StoredSession>
 }
+
+data class StoredSession(
+    val id: String,
+    val updatedAtEpochMs: Long,
+    val messageCount: Int,
+)

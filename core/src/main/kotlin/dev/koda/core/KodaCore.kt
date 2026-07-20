@@ -20,7 +20,12 @@ import dev.koda.protocol.ApprovalResponse
 import dev.koda.protocol.CompactSession
 import dev.koda.protocol.Event
 import dev.koda.protocol.Interrupt
+import dev.koda.protocol.ListSessions
+import dev.koda.protocol.PermissionModeSetting
+import dev.koda.protocol.SessionList
 import dev.koda.protocol.SessionStarted
+import dev.koda.protocol.SessionSummary
+import dev.koda.protocol.SetPermissionMode
 import dev.koda.protocol.Submission
 import dev.koda.protocol.UserTurn
 import dev.koda.tools.ToolContext
@@ -44,7 +49,7 @@ import kotlinx.coroutines.launch
 class KodaCore(
     private val config: KodaConfig,
     executor: PromptExecutor,
-    model: LLModel,
+    private val model: LLModel,
     private val repository: SessionRepository,
     private val permissionPolicyFactory: () -> PermissionPolicy =
         { ModePermissionPolicy(config.permissionMode) },
@@ -73,6 +78,20 @@ class KodaCore(
                 is ApprovalResponse ->
                     sessions[submission.sessionId]
                         ?.session?.approvals?.resolve(submission.approvalId, submission.decision)
+                is ListSessions -> _events.emit(
+                    SessionList(
+                        submission.sessionId,
+                        repository.list().map { SessionSummary(it.id, it.updatedAtEpochMs, it.messageCount) },
+                    )
+                )
+                is SetPermissionMode ->
+                    runtimeFor(submission.sessionId).session.permissions.updateMode(
+                        when (submission.mode) {
+                            PermissionModeSetting.DEFAULT -> PermissionMode.DEFAULT
+                            PermissionModeSetting.ACCEPT_EDITS -> PermissionMode.ACCEPT_EDITS
+                            PermissionModeSetting.YOLO -> PermissionMode.YOLO
+                        }
+                    )
             }
         }
     }
@@ -95,7 +114,15 @@ class KodaCore(
         )
         val runtime = SessionRuntime(session)
         sessions[sessionId] = runtime
-        _events.emit(SessionStarted(sessionId, config.model, config.provider.name, config.cwd.toString()))
+        _events.emit(
+            SessionStarted(
+                sessionId,
+                config.model,
+                config.provider.name,
+                config.cwd.toString(),
+                contextLength = model.contextLength ?: 0,
+            )
+        )
         return runtime
     }
 
