@@ -6,8 +6,8 @@ import dev.koda.core.PermissionMode
 import dev.koda.protocol.Event
 import dev.koda.protocol.ProtocolJson
 import dev.koda.protocol.Submission
-import dev.koda.providers.ApiShape
-import dev.koda.providers.ProviderConfig
+import dev.koda.core.ApiShape
+import dev.koda.core.ProviderConfig
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer

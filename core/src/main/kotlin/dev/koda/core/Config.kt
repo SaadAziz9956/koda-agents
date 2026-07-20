@@ -1,6 +1,5 @@
 package dev.koda.core
 
-import dev.koda.providers.ProviderConfig
 import java.nio.file.Path
 
 enum class PermissionMode {
@@ -13,6 +12,16 @@ enum class PermissionMode {
     /** Nothing asks. The user opted out of the gate entirely. */
     YOLO,
 }
+
+/** Which vendor API shape the provider speaks. Koog client selection keys off this. */
+enum class ApiShape { ANTHROPIC_MESSAGES, OPENAI_CHAT_COMPLETIONS }
+
+data class ProviderConfig(
+    val name: String,
+    val baseUrl: String,
+    val apiKey: String,
+    val apiShape: ApiShape,
+)
 
 data class KodaConfig(
     val provider: ProviderConfig,

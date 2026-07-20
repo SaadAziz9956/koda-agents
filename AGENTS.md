@@ -3,7 +3,9 @@
 Koda is a personal autonomous agent harness in Kotlin: Hermes-shaped identity
 (multi-surface personal agent), Codex-shaped architecture (core + typed
 protocol, every surface a thin client), Claude-Code-shaped tool semantics
-(exact-string Edit, read-before-edit, permission gate in front of dispatch).
+(exact-string Edit, read-before-edit, permission gate in front of dispatch),
+with **JetBrains Koog as the engine** (LLM clients, functional-strategy agent
+loop, tool runtime) — the harness around it is entirely ours.
 
 ## Design laws
 
@@ -34,10 +36,12 @@ These are ordered. When they conflict, the lower number wins.
    opted out. Deny always wins. Nothing the model outputs can widen its
    own permissions.
 
-6. **Kotlin-native stack only.** kotlinx.coroutines, kotlinx.serialization,
-   Ktor. No Java frameworks, no reflection-based DI containers, no
-   annotation processors. A new dependency needs a reason the kotlinx
-   ecosystem can't provide.
+6. **Kotlin-native stack: kotlinx + Ktor + Koog.** Koog is the engine —
+   provider clients, the functional agent runtime, tool schemas, and
+   (coming) MCP/compression/checkpoints. Koog types must not leak past
+   `core`: the protocol, tools domain logic, and surfaces stay
+   framework-free so the engine remains swappable. No Java frameworks,
+   no reflection-based DI containers, no annotation processors.
 
 7. **Ports and adapters, dependencies point inward.** The core depends on
    interfaces (`core/port/*`); implementations live in `core/adapter/*`
@@ -50,9 +54,8 @@ These are ordered. When they conflict, the lower number wins.
 ## Module map
 
 - `protocol` — wire types (`Submission`/`Event`), kotlinx.serialization. Zero deps beyond serialization.
-- `providers` — normalized `ChatMessage`/`LlmRequest` model + one transport per API *shape*: `AnthropicTransport` (Messages API), `OpenAiTransport` (Chat Completions — covers all OpenAI-compatible hosts).
-- `tools` — `KodaTool` interface + registry + core toolset: read, write, edit, bash, grep, glob, todo.
-- `core` — the use-case layer. `AgentLoop` (the loop), `AgentSession` (state), `ApprovalBroker` (approval handshake), `KodaCore` (facade + `SessionRuntime` orchestration), `core/port/*` (SessionRepository, PermissionPolicy), `core/adapter/*` (JSONL repository, mode-based policy).
+- `tools` — framework-free domain tools: `KodaTool` interface + read, write, edit, bash, grep, glob, todo. No Koog imports here, ever.
+- `core` — the use-case layer on Koog. `engine/KoogEngine` (per-turn functional-strategy AIAgent), `engine/ToolGate` (permission gate + events in front of every dispatch), `engine/KoogTools` (typed Koog bridges over the domain tools), `AgentSession` (state; conversation = Koog `Prompt`, committed only on successful turns), `ApprovalBroker`, `KodaCore` (facade + `SessionRuntime`), `core/port/*` (SessionRepository, PermissionPolicy), `core/adapter/*` (prompt-file repository, mode-based policy).
 - `cli` — interactive terminal client + `-p` headless mode. Runs the core in-process, through the protocol boundary only.
 - `daemon` — the same core served over WebSocket (`ws://127.0.0.1:4477/ws`) for future surfaces.
 

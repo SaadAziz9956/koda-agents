@@ -1,7 +1,7 @@
 # Koda
 
 An autonomous personal agent harness in Kotlin — Hermes-class identity,
-Codex-class architecture, built from the ground up (no agent framework).
+Codex-class architecture, built from the ground up (JetBrains Koog as the engine, the harness built around it).
 
 ```
 ┌─────────┐  Submission  ┌──────────────────────────────┐

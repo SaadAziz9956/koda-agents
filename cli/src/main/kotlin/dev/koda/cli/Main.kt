@@ -17,8 +17,8 @@ import dev.koda.protocol.ToolEnd
 import dev.koda.protocol.TurnCompleted
 import dev.koda.protocol.TurnStopReason
 import dev.koda.protocol.UserTurn
-import dev.koda.providers.ApiShape
-import dev.koda.providers.ProviderConfig
+import dev.koda.core.ApiShape
+import dev.koda.core.ProviderConfig
 import java.nio.file.Path
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers

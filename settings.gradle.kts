@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 
-include("protocol", "providers", "tools", "core", "cli", "daemon")
+include("protocol", "tools", "core", "cli", "daemon")

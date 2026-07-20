@@ -9,8 +9,8 @@ kotlin {
 
 dependencies {
     api(project(":protocol"))
-    api(project(":providers"))
     api(project(":tools"))
+    api(libs.koog.agents)
     api(libs.coroutines.core)
     implementation(libs.serialization.json)
 }

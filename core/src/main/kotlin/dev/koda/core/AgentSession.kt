@@ -1,15 +1,15 @@
 package dev.koda.core
 
+import ai.koog.prompt.Prompt
 import dev.koda.core.port.PermissionPolicy
 import dev.koda.core.port.SessionRepository
-import dev.koda.providers.ChatMessage
 import dev.koda.tools.ToolContext
 
 /**
- * Per-session state: the conversation, tool context, frozen system prompt,
- * permission policy, and approval broker. Pure state — no orchestration.
- * The message list is only mutated through [addMessage] so persistence
- * can never drift from memory.
+ * Per-session state: the conversation (as a Koog [Prompt]), tool context,
+ * frozen system prompt, permission policy, and approval broker. Pure state —
+ * no orchestration. The prompt is only committed at the end of a successful
+ * turn, so an interrupted turn rolls back cleanly.
  */
 class AgentSession(
     val id: String,
@@ -19,12 +19,14 @@ class AgentSession(
     val approvals: ApprovalBroker,
     private val repository: SessionRepository,
 ) {
-    private val _messages: MutableList<ChatMessage> = repository.load(id).toMutableList()
+    /** Full conversation including system message; null until the first completed turn. */
+    var prompt: Prompt? = repository.load(id)
 
-    val messages: List<ChatMessage> get() = _messages
+    /** Set by the engine at turn start; read by the tool gate for event correlation. */
+    @Volatile
+    var currentTurnId: String = ""
 
-    fun addMessage(message: ChatMessage) {
-        _messages += message
-        repository.append(id, message)
+    fun persist() {
+        prompt?.let { repository.save(id, it) }
     }
 }
