@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
     implementation(libs.ktor.server.websockets)
+    runtimeOnly(libs.slf4j.nop)
 }
 
 application {

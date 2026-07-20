@@ -10,6 +10,7 @@ kotlin {
 dependencies {
     implementation(project(":core"))
     implementation(libs.coroutines.core)
+    runtimeOnly(libs.slf4j.nop)
 }
 
 application {

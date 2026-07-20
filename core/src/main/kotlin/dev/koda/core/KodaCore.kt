@@ -1,7 +1,9 @@
 package dev.koda.core
 
 import ai.koog.http.client.ktor.KtorKoogHttpClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
@@ -163,19 +165,48 @@ class KodaCore(
     }
 
     companion object {
-        /** Default composition root: Koog executor per provider, file persistence, default tools. */
-        fun create(config: KodaConfig): KodaCore = KodaCore(
-            config = config,
-            executor = buildExecutor(config.provider),
-            model = buildModel(config),
-            repository = PromptFileSessionRepository(config.sessionsDir),
+        /**
+         * Known Anthropic models: resolving from Koog's catalog inherits the
+         * real context length and capabilities (prompt caching, vision, thinking).
+         */
+        private val ANTHROPIC_CATALOG: List<LLModel> = listOf(
+            AnthropicModels.Fable_5,
+            AnthropicModels.Opus_4_7,
+            AnthropicModels.Opus_4_6,
+            AnthropicModels.Opus_4_5,
+            AnthropicModels.Opus_4_1,
+            AnthropicModels.Opus_4,
+            AnthropicModels.Sonnet_4_6,
+            AnthropicModels.Sonnet_4_5,
+            AnthropicModels.Sonnet_4,
+            AnthropicModels.Haiku_4_5,
         )
 
-        private fun buildExecutor(provider: ProviderConfig): PromptExecutor {
+        /** Default composition root: Koog executor per provider, file persistence, default tools. */
+        fun create(config: KodaConfig): KodaCore {
+            val model = buildModel(config)
+            return KodaCore(
+                config = config,
+                executor = buildExecutor(config.provider, model),
+                model = model,
+                repository = PromptFileSessionRepository(config.sessionsDir),
+            )
+        }
+
+        private fun buildExecutor(provider: ProviderConfig, model: LLModel): PromptExecutor {
             val httpFactory = KtorKoogHttpClient.Factory()
             return when (provider.apiShape) {
                 ApiShape.ANTHROPIC_MESSAGES -> MultiLLMPromptExecutor(
-                    AnthropicLLMClient(apiKey = provider.apiKey, httpClientFactory = httpFactory)
+                    AnthropicLLMClient(
+                        apiKey = provider.apiKey,
+                        // The client resolves the wire model id through this map;
+                        // include the active model so custom ids work too.
+                        settings = AnthropicClientSettings(
+                            modelVersionsMap = ANTHROPIC_CATALOG.associateWith { it.id } +
+                                (model to model.id),
+                        ),
+                        httpClientFactory = httpFactory,
+                    )
                 )
                 ApiShape.OPENAI_CHAT_COMPLETIONS -> MultiLLMPromptExecutor(
                     OpenAILLMClient(
@@ -187,23 +218,36 @@ class KodaCore(
             }
         }
 
-        private fun buildModel(config: KodaConfig): LLModel = LLModel(
-            provider = when (config.provider.apiShape) {
-                ApiShape.ANTHROPIC_MESSAGES -> LLMProvider.Anthropic
-                ApiShape.OPENAI_CHAT_COMPLETIONS -> LLMProvider.OpenAI
-            },
-            id = config.model,
-            capabilities = buildList {
-                add(LLMCapability.Completion)
-                add(LLMCapability.Tools)
-                add(LLMCapability.ToolChoice)
-                add(LLMCapability.Temperature)
-                if (config.provider.apiShape == ApiShape.OPENAI_CHAT_COMPLETIONS) {
-                    add(LLMCapability.OpenAIEndpoint.Completions)
-                }
-            },
-            contextLength = 200_000,
-            maxOutputTokens = config.maxTokens.toLong(),
-        )
+        private fun buildModel(config: KodaConfig): LLModel = when (config.provider.apiShape) {
+            ApiShape.ANTHROPIC_MESSAGES ->
+                ANTHROPIC_CATALOG.firstOrNull { it.id == config.model }
+                    ?: LLModel(
+                        provider = LLMProvider.Anthropic,
+                        id = config.model,
+                        capabilities = listOf(
+                            LLMCapability.Completion,
+                            LLMCapability.Tools,
+                            LLMCapability.ToolChoice,
+                            LLMCapability.Temperature,
+                            LLMCapability.PromptCaching,
+                        ),
+                        contextLength = 200_000,
+                        maxOutputTokens = config.maxTokens.toLong(),
+                    )
+
+            ApiShape.OPENAI_CHAT_COMPLETIONS -> LLModel(
+                provider = LLMProvider.OpenAI,
+                id = config.model,
+                capabilities = listOf(
+                    LLMCapability.Completion,
+                    LLMCapability.Tools,
+                    LLMCapability.ToolChoice,
+                    LLMCapability.Temperature,
+                    LLMCapability.OpenAIEndpoint.Completions,
+                ),
+                contextLength = 200_000,
+                maxOutputTokens = config.maxTokens.toLong(),
+            )
+        }
     }
 }
