@@ -25,6 +25,12 @@ Headless single turn:
 ./gradlew :cli:run -q --console=plain --args='-p "list the kotlin files here" --yolo'
 ```
 
+TUI (Mordant-rendered terminal surface — markdown replies, styled tool activity, status line):
+
+```sh
+./gradlew :tui:installDist -q && ./tui/build/install/tui/bin/tui
+```
+
 Daemon (WebSocket surface for other clients):
 
 ```sh
