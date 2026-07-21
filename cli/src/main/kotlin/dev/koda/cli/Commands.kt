@@ -96,7 +96,7 @@ val COMMANDS: List<CliCommand> = listOf(
     CliCommand("compact", "/compact", "Compress this session's history") { ctx, _ ->
         ctx.core.submit(CompactSession(UUID.randomUUID().toString(), ctx.state.sessionId))
         ctx.inbox.awaitFirst<SessionCompacted>()?.let {
-            println("${DIM}compacted: ${it.tokensBefore} -> ${it.tokensAfter} tokens${RESET}")
+            println("${DIM}compacted: ${it.messagesBefore} -> ${it.messagesAfter} messages${RESET}")
         }
     },
 

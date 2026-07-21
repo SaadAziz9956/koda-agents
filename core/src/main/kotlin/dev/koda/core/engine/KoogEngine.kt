@@ -105,10 +105,11 @@ class KoogEngine(
         try {
             val strategy = functionalStrategy<String, String>("koda-compact") { _ ->
                 restoreConversation(session)
-                val before = latestTokenUsage().toLong()
+                val before = llm.readSession { prompt.messages.size }
                 compressHistory()
                 session.prompt = llm.readSession { prompt }
-                events.emit(SessionCompacted(session.id, before, latestTokenUsage().toLong()))
+                val after = llm.readSession { prompt.messages.size }
+                events.emit(SessionCompacted(session.id, before, after))
                 ""
             }
             newAgent(session, registry, strategy = strategy).run("compact")
@@ -144,8 +145,10 @@ class KoogEngine(
         val contextLength = model.contextLength ?: return
         val used = latestTokenUsage().toLong()
         if (used > contextLength * AUTO_COMPACT_THRESHOLD) {
+            val before = llm.readSession { prompt.messages.size }
             compressHistory()
-            events.emit(SessionCompacted(session.id, used, latestTokenUsage().toLong()))
+            val after = llm.readSession { prompt.messages.size }
+            events.emit(SessionCompacted(session.id, before, after))
         }
     }
 

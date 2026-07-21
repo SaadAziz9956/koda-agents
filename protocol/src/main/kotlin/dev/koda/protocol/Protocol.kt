@@ -276,13 +276,17 @@ enum class TurnStopReason {
     @SerialName("error") ERROR,
 }
 
-/** History compression finished (manual /compact or automatic). */
+/**
+ * History compression finished (manual /compact or automatic). Reported as
+ * message counts — a truthful before/after, unlike last-request token usage
+ * which reflects the summarization call itself.
+ */
 @Serializable
 @SerialName("session_compacted")
 data class SessionCompacted(
     override val sessionId: String,
-    val tokensBefore: Long,
-    val tokensAfter: Long,
+    val messagesBefore: Int,
+    val messagesAfter: Int,
 ) : Event
 
 @Serializable

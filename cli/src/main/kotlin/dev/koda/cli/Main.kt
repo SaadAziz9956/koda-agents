@@ -1,37 +1,16 @@
 package dev.koda.cli
 
-import dev.koda.core.KodaConfig
-import dev.koda.core.KodaCore
-import dev.koda.core.PermissionMode
-import dev.koda.protocol.ApprovalDecision
-import dev.koda.protocol.ApprovalRequest
-import dev.koda.protocol.ApprovalResponse
-import dev.koda.protocol.AssistantMessage
-import dev.koda.protocol.ErrorEvent
-import dev.koda.protocol.Event
-import dev.koda.protocol.SessionStarted
-import dev.koda.protocol.TextDelta
-import dev.koda.protocol.TokenUsage
-import dev.koda.protocol.ToolBegin
-import dev.koda.protocol.ToolEnd
-import dev.koda.protocol.TurnCompleted
-import dev.koda.protocol.TurnStopReason
-import dev.koda.protocol.UserTurn
-import dev.koda.core.ApiShape
-import dev.koda.core.ProviderConfig
-import dev.koda.protocol.CompactSession
-import dev.koda.protocol.Interrupt
-import dev.koda.protocol.Notice
-import dev.koda.protocol.SessionCompacted
-import java.nio.file.Path
-import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
+import dev.koda.core.*
+import dev.koda.protocol.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import sun.misc.Signal
+import java.nio.file.Path
+import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val DIM = "\u001B[2m"
 internal const val BOLD = "\u001B[1m"
@@ -154,7 +133,7 @@ private suspend fun runTurn(
                 if (event.sessionId == sessionId) state.lastPromptTokens = event.inputTokens
 
             is SessionCompacted ->
-                println("${DIM}(auto-compacted: ${event.tokensBefore} -> ${event.tokensAfter} tokens)${RESET}")
+                println("${DIM}(auto-compacted: ${event.messagesBefore} -> ${event.messagesAfter} messages)${RESET}")
 
             is Notice ->
                 println("${DIM}${event.text}${RESET}")
@@ -168,8 +147,10 @@ private suspend fun runTurn(
                 when (event.stopReason) {
                     TurnStopReason.MAX_ITERATIONS ->
                         println("${YELLOW}(stopped: hit max iterations for this turn)${RESET}")
+
                     TurnStopReason.INTERRUPTED ->
                         println("${YELLOW}(interrupted)${RESET}")
+
                     else -> {}
                 }
                 return
@@ -236,6 +217,7 @@ private data class CliArgs(
                         )
                         kotlin.system.exitProcess(0)
                     }
+
                     else -> if (!arg.startsWith("-") && prompt == null) prompt = arg
                 }
                 i++
@@ -257,19 +239,22 @@ private fun resolveProvider(cli: CliArgs): ProviderConfig {
             apiKey = anthropicKey ?: fail("ANTHROPIC_API_KEY is not set"),
             apiShape = ApiShape.ANTHROPIC_MESSAGES,
         )
+
         "openai" -> ProviderConfig(
             name = "openai",
             baseUrl = "https://api.openai.com/v1",
             apiKey = openaiKey ?: fail("OPENAI_API_KEY is not set"),
             apiShape = ApiShape.OPENAI_CHAT_COMPLETIONS,
         )
+
         "custom" -> ProviderConfig(
             name = "custom",
             baseUrl = cli.baseUrl ?: System.getenv("KODA_BASE_URL")
-                ?: fail("--base-url or KODA_BASE_URL required for --provider custom"),
+            ?: fail("--base-url or KODA_BASE_URL required for --provider custom"),
             apiKey = customKey ?: openaiKey ?: "",
             apiShape = ApiShape.OPENAI_CHAT_COMPLETIONS,
         )
+
         else -> fail("Unknown provider: ${cli.providerName}")
     }
 }
