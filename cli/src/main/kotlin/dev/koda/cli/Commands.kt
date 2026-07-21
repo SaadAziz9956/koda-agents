@@ -68,12 +68,11 @@ val COMMANDS: List<CliCommand> = listOf(
     },
 
     CliCommand("sessions", "/sessions", "List persisted sessions") { ctx, _ ->
-        ctx.core.submit(ListSessions(UUID.randomUUID().toString(), ctx.state.sessionId))
-        val list = ctx.inbox.awaitFirst<SessionList>() ?: return@CliCommand
-        if (list.sessions.isEmpty()) {
+        val sessions = fetchSessions(ctx) ?: return@CliCommand
+        if (sessions.isEmpty()) {
             println("${DIM}no persisted sessions${RESET}")
         } else {
-            list.sessions.forEach { s ->
+            sessions.forEach { s ->
                 val current = if (s.id == ctx.state.sessionId) " ${CYAN}(current)${RESET}" else ""
                 val time = timeFormat.format(
                     Instant.ofEpochMilli(s.updatedAtEpochMs).atZone(ZoneId.systemDefault())
@@ -86,10 +85,17 @@ val COMMANDS: List<CliCommand> = listOf(
     CliCommand("resume", "/resume <id>", "Switch to a persisted session") { ctx, arg ->
         if (arg.isNullOrBlank()) {
             println("${YELLOW}usage: /resume <session-id> — see /sessions${RESET}")
+            return@CliCommand
+        }
+        val id = arg.trim()
+        val sessions = fetchSessions(ctx) ?: return@CliCommand
+        val match = sessions.firstOrNull { it.id == id }
+        if (match == null) {
+            println("${YELLOW}no persisted session '$id' — run /sessions to see valid ids${RESET}")
         } else {
-            ctx.state.sessionId = arg.trim()
+            ctx.state.sessionId = id
             ctx.state.lastPromptTokens = 0
-            println("${DIM}resumed session: ${ctx.state.sessionId} (history loads on your next message)${RESET}")
+            println("${DIM}resumed '$id' (${match.messageCount} messages) — its history is active on your next message${RESET}")
         }
     },
 
@@ -186,6 +192,11 @@ class CommandOutcome(val turnText: String?)
 private suspend fun fetchSkills(ctx: CommandContext): List<dev.koda.protocol.SkillSummary>? {
     ctx.core.submit(ListSkills(UUID.randomUUID().toString(), ctx.state.sessionId))
     return ctx.inbox.awaitFirst<SkillList>()?.skills
+}
+
+private suspend fun fetchSessions(ctx: CommandContext): List<dev.koda.protocol.SessionSummary>? {
+    ctx.core.submit(ListSessions(UUID.randomUUID().toString(), ctx.state.sessionId))
+    return ctx.inbox.awaitFirst<SessionList>()?.sessions
 }
 
 /** Drains the inbox until an event of type [T] or an [ErrorEvent] arrives. */
