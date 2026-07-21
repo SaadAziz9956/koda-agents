@@ -21,8 +21,14 @@ def sse(chunk):
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        import os
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         messages = body.get("messages", [])
+        # Test knob: dump the whole request (overwrites each call; last call wins).
+        dump = os.environ.get("KODA_MOCK_DUMP")
+        if dump:
+            with open(dump, "w") as fh:
+                json.dump(messages, fh, indent=1)
         has_tool_result = any(m.get("role") == "tool" for m in messages)
         stream = bool(body.get("stream"))
 
@@ -34,8 +40,13 @@ class Handler(BaseHTTPRequestHandler):
 
         is_subagent = "sub-agent" in str(messages[0].get("content", "")).lower() if messages else False
 
+        read_path = os.environ.get("KODA_MOCK_READ_PATH")
+
         if not has_tool_result:
-            if is_subagent:
+            if read_path and not is_subagent:
+                # Test knob: read a specific path (to exercise subtree context loading).
+                call = {"name": "read", "arguments": json.dumps({"file_path": read_path})}
+            elif is_subagent:
                 # Subagent: do one read-only search, then (next turn) summarize.
                 call = {"name": "glob", "arguments": "{\"pattern\": \"**/*.kt\"}"}
             elif "delegate" in user_text.lower():

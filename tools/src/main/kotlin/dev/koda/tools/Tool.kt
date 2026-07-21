@@ -37,6 +37,9 @@ class ToolContext(
     /** Skills available to this session, keyed by name (see [SkillTool]). */
     val skills: MutableMap<String, LoadedSkill> = mutableMapOf()
 
+    /** Subtree directories whose context files have already been surfaced this session. */
+    val seenContextDirs: MutableSet<Path> = mutableSetOf()
+
     fun resolve(filePath: String): Path {
         val p = Path.of(filePath)
         return (if (p.isAbsolute) p else cwd.resolve(p)).normalize()
