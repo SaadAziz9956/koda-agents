@@ -46,3 +46,21 @@ Daemon (WebSocket surface for other clients):
 Sessions persist as JSONL under `~/.koda/sessions/`.
 
 See [AGENTS.md](AGENTS.md) for the design constitution and roadmap.
+
+## Development
+
+Branching model:
+
+- **`main`** — production. Stable, tested releases only; every commit is a shippable version.
+- **`dev`** — integration. Work merges here first and is verified before promotion to `main`.
+- **`feature/*`** — one branch per feature, cut from `dev`, merged back into `dev` when done.
+
+Flow: `feature/x` → `dev` → `main`.
+
+Build and run:
+
+```sh
+./gradlew build                          # compile all modules
+./gradlew :cli:installDist               # produce cli/build/install/cli/bin/cli
+python3 scripts/mock_llm.py              # offline test provider (no API key)
+```
