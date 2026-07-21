@@ -26,13 +26,17 @@ class Handler(BaseHTTPRequestHandler):
         has_tool_result = any(m.get("role") == "tool" for m in messages)
         stream = bool(body.get("stream"))
 
-        wants_echo = any(
-            m.get("role") == "user" and "echo" in str(m.get("content", "")).lower()
-            for m in messages
+        import re
+        user_text = " ".join(
+            str(m.get("content", "")) for m in messages if m.get("role") == "user"
         )
+        skill_match = re.search(r"'([\w-]+)' skill", user_text)
 
         if not has_tool_result:
-            if wants_echo:
+            if skill_match:
+                call = {"name": "skill",
+                        "arguments": json.dumps({"name": skill_match.group(1)})}
+            elif "echo" in user_text.lower():
                 call = {"name": "echo", "arguments": "{\"message\": \"hello from koda\"}"}
             else:
                 call = {"name": "glob", "arguments": "{\"pattern\": \"**/*.kts\"}"}

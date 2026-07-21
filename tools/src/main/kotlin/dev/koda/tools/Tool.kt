@@ -34,6 +34,9 @@ class ToolContext(
     /** Session todo list (see [TodoTool]). */
     val todos: MutableList<TodoItem> = mutableListOf()
 
+    /** Skills available to this session, keyed by name (see [SkillTool]). */
+    val skills: MutableMap<String, LoadedSkill> = mutableMapOf()
+
     fun resolve(filePath: String): Path {
         val p = Path.of(filePath)
         return (if (p.isAbsolute) p else cwd.resolve(p)).normalize()
@@ -69,6 +72,7 @@ class ToolRegistry(tools: List<KodaTool>) {
                 GrepTool(),
                 GlobTool(),
                 TodoTool(),
+                SkillTool(),
             )
         )
     }

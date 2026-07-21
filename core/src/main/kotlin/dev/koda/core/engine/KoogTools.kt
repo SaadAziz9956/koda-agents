@@ -10,6 +10,7 @@ import dev.koda.tools.GlobTool
 import dev.koda.tools.GrepTool
 import dev.koda.tools.KodaTool
 import dev.koda.tools.ReadTool
+import dev.koda.tools.SkillTool
 import dev.koda.tools.TodoTool
 import dev.koda.tools.WriteTool
 import kotlinx.serialization.Serializable
@@ -107,6 +108,15 @@ class KoogGlobTool(gate: ToolGate) : GatedTool<GlobArgs>(typeToken<GlobArgs>(), 
 }
 
 @Serializable
+data class SkillArgs(val name: String)
+
+class KoogSkillTool(gate: ToolGate) : GatedTool<SkillArgs>(typeToken<SkillArgs>(), SkillTool(), gate) {
+    override fun toJson(args: SkillArgs): JsonObject = buildJsonObject {
+        put("name", args.name)
+    }
+}
+
+@Serializable
 data class TodoArgs(val items: List<String>)
 
 class KoogTodoTool(gate: ToolGate) : GatedTool<TodoArgs>(typeToken<TodoArgs>(), TodoTool(), gate) {
@@ -126,6 +136,7 @@ fun kodaToolRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
             KoogGrepTool(gate),
             KoogGlobTool(gate),
             KoogTodoTool(gate),
+            KoogSkillTool(gate),
         )
     )
 }

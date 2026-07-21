@@ -80,7 +80,7 @@ fun main(args: Array<String>) {
                 runTurn(core, inbox, state, cli.prompt, headless = true)
                 turnActive.set(false)
             } else {
-                println("${BOLD}koda${RESET} ${DIM}v0.4.0 — ${config.model} @ ${provider.name} — session ${state.sessionId}${RESET}")
+                println("${BOLD}koda${RESET} ${DIM}v0.5.0 — ${config.model} @ ${provider.name} — session ${state.sessionId}${RESET}")
                 println("${DIM}Type a message; /help for commands; Ctrl-C interrupts a turn; 'exit' quits.${RESET}")
                 while (true) {
                     val pct = state.contextPercent?.let { "${DIM}[$it%]${RESET} " } ?: ""
@@ -89,9 +89,10 @@ fun main(args: Array<String>) {
                     val line = readlnOrNull()?.trim() ?: break
                     if (line.isEmpty()) continue
                     if (line == "exit" || line == "/quit" || line == "/exit") break
-                    if (dispatchCommand(line, commandContext)) continue
+                    val outcome = dispatchCommand(line, commandContext)
+                    val turnText = if (outcome != null) outcome.turnText ?: continue else line
                     turnActive.set(true)
-                    runTurn(core, inbox, state, line, headless = false)
+                    runTurn(core, inbox, state, turnText, headless = false)
                     turnActive.set(false)
                 }
             }

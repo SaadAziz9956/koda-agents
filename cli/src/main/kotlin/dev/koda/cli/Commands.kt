@@ -7,11 +7,13 @@ import dev.koda.protocol.ErrorEvent
 import dev.koda.protocol.Event
 import dev.koda.protocol.ListMcpServers
 import dev.koda.protocol.ListSessions
+import dev.koda.protocol.ListSkills
 import dev.koda.protocol.McpServerList
 import dev.koda.protocol.PermissionModeSetting
 import dev.koda.protocol.SessionCompacted
 import dev.koda.protocol.SessionList
 import dev.koda.protocol.SetPermissionMode
+import dev.koda.protocol.SkillList
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -107,6 +109,18 @@ val COMMANDS: List<CliCommand> = listOf(
         println("  ${DIM}mode:${RESET}    ${state.mode.name.lowercase()}")
     },
 
+    CliCommand("skills", "/skills", "List available skills") { ctx, _ ->
+        val skills = fetchSkills(ctx) ?: return@CliCommand
+        if (skills.isEmpty()) {
+            println("${DIM}no skills installed — add SKILL.md dirs under ~/.koda/skills or .koda/skills${RESET}")
+        } else {
+            skills.forEach { skill ->
+                println("  ${BOLD}${skill.name.padEnd(32)}${RESET}${DIM}${skill.description.take(90)}${RESET}")
+            }
+            println("${DIM}${skills.size} skills — invoke one with /<skill-name> [args]${RESET}")
+        }
+    },
+
     CliCommand("mcp", "/mcp", "List connected MCP servers and their tools") { ctx, _ ->
         ctx.core.submit(ListMcpServers(UUID.randomUUID().toString(), ctx.state.sessionId))
         val list = ctx.inbox.awaitFirst<McpServerList>() ?: return@CliCommand
@@ -138,17 +152,40 @@ val COMMANDS: List<CliCommand> = listOf(
     },
 )
 
-/** Returns true if the line was a slash command (known or not). */
-suspend fun dispatchCommand(line: String, ctx: CommandContext): Boolean {
-    if (!line.startsWith("/")) return false
+/**
+ * Returns null if the line is not a slash command; otherwise handles it and
+ * returns an optional user-turn text to submit (slash-invoked skills become
+ * turns instructing the model to load and follow the skill).
+ */
+suspend fun dispatchCommand(line: String, ctx: CommandContext): CommandOutcome? {
+    if (!line.startsWith("/")) return null
     val parts = line.removePrefix("/").split(" ", limit = 2)
-    val command = COMMANDS.firstOrNull { it.name == parts[0].lowercase() }
-    if (command == null) {
-        println("${YELLOW}unknown command: /${parts[0]} — try /help${RESET}")
-    } else {
-        command.run(ctx, parts.getOrNull(1))
+    val name = parts[0].lowercase()
+    val args = parts.getOrNull(1)
+
+    COMMANDS.firstOrNull { it.name == name }?.let { command ->
+        command.run(ctx, args)
+        return CommandOutcome(turnText = null)
     }
-    return true
+
+    // Fall back to skills: /skill-name [args] invokes the skill as a turn.
+    val skill = fetchSkills(ctx)?.firstOrNull { it.name.lowercase() == name }
+    if (skill != null) {
+        val argsSuffix = args?.let { "\n\nArguments: $it" } ?: ""
+        return CommandOutcome(
+            turnText = "Load the '${skill.name}' skill with the skill tool and follow its instructions.$argsSuffix"
+        )
+    }
+
+    println("${YELLOW}unknown command: /${parts[0]} — try /help or /skills${RESET}")
+    return CommandOutcome(turnText = null)
+}
+
+class CommandOutcome(val turnText: String?)
+
+private suspend fun fetchSkills(ctx: CommandContext): List<dev.koda.protocol.SkillSummary>? {
+    ctx.core.submit(ListSkills(UUID.randomUUID().toString(), ctx.state.sessionId))
+    return ctx.inbox.awaitFirst<SkillList>()?.skills
 }
 
 /** Drains the inbox until an event of type [T] or an [ErrorEvent] arrives. */

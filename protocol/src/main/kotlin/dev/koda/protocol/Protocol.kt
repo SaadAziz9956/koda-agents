@@ -79,6 +79,14 @@ data class ListMcpServers(
     override val sessionId: String,
 ) : Submission
 
+/** Ask the core for available skills. Answered with [SkillList]. */
+@Serializable
+@SerialName("list_skills")
+data class ListSkills(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 /** Change the permission mode of a running session. */
 @Serializable
 @SerialName("set_permission_mode")
@@ -149,6 +157,20 @@ data class McpServerList(
 data class McpServerSummary(
     val name: String,
     val toolNames: List<String>,
+)
+
+/** Answer to [ListSkills]. */
+@Serializable
+@SerialName("skill_list")
+data class SkillList(
+    override val sessionId: String,
+    val skills: List<SkillSummary>,
+) : Event
+
+@Serializable
+data class SkillSummary(
+    val name: String,
+    val description: String,
 )
 
 /** Informational message from the core (startup notices, MCP connect results). */

@@ -13,9 +13,10 @@ import kotlin.io.path.readText
 object SystemPrompt {
 
     private const val MAX_CONTEXT_FILE_CHARS = 20_000
+    private const val MAX_SKILL_LINES = 150
     private val CONTEXT_FILE_NAMES = listOf("KODA.md", "AGENTS.md", "CLAUDE.md")
 
-    fun build(config: KodaConfig): String = buildString {
+    fun build(config: KodaConfig, skills: Map<String, dev.koda.tools.LoadedSkill> = emptyMap()): String = buildString {
         appendLine(
             """
             You are Koda, an autonomous personal agent running on the user's machine.
@@ -42,6 +43,21 @@ object SystemPrompt {
             appendLine()
             appendLine("# Project context ($name)")
             appendLine(content)
+        }
+
+        if (skills.isNotEmpty()) {
+            appendLine()
+            appendLine("# Skills")
+            appendLine(
+                "Specialized instructions you can load on demand. When a task matches a " +
+                    "skill, call the skill tool with its name FIRST and follow the loaded instructions."
+            )
+            skills.values.sortedBy { it.name }.take(MAX_SKILL_LINES).forEach { skill ->
+                appendLine("- ${skill.name}: ${skill.description}")
+            }
+            if (skills.size > MAX_SKILL_LINES) {
+                appendLine("… and ${skills.size - MAX_SKILL_LINES} more (any can be loaded by name)")
+            }
         }
     }
 

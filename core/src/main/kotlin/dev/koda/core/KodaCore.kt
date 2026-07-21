@@ -27,6 +27,9 @@ import dev.koda.protocol.Event
 import dev.koda.protocol.Interrupt
 import dev.koda.protocol.ListMcpServers
 import dev.koda.protocol.ListSessions
+import dev.koda.protocol.ListSkills
+import dev.koda.protocol.SkillList
+import dev.koda.protocol.SkillSummary
 import dev.koda.protocol.McpServerList
 import dev.koda.protocol.McpServerSummary
 import dev.koda.protocol.Notice
@@ -77,6 +80,7 @@ class KodaCore(
     )
 
     private val mcpConnections = mutableListOf<McpConnection>()
+    private val skills = SkillsLoader.load(config.kodaHome, config.cwd)
 
     val events: SharedFlow<Event> get() = _events
 
@@ -100,6 +104,12 @@ class KodaCore(
                     McpServerList(
                         submission.sessionId,
                         mcpConnections.map { McpServerSummary(it.name, it.toolNames) },
+                    )
+                )
+                is ListSkills -> _events.emit(
+                    SkillList(
+                        submission.sessionId,
+                        skills.values.sortedBy { it.name }.map { SkillSummary(it.name, it.description) },
                     )
                 )
                 is SetPermissionMode ->
@@ -139,8 +149,8 @@ class KodaCore(
         sessions[sessionId]?.let { return it }
         val session = AgentSession(
             id = sessionId,
-            systemPrompt = SystemPrompt.build(config),
-            toolContext = ToolContext(config.cwd),
+            systemPrompt = SystemPrompt.build(config, skills),
+            toolContext = ToolContext(config.cwd).apply { this.skills.putAll(this@KodaCore.skills) },
             permissions = permissionPolicyFactory(),
             approvals = ApprovalBroker(),
             repository = repository,
