@@ -47,6 +47,27 @@ Sessions persist as JSONL under `~/.koda/sessions/`.
 
 See [AGENTS.md](AGENTS.md) for the design constitution and roadmap.
 
+## Hooks
+
+Lifecycle subprocesses configured in `~/.koda/hooks.json` (global) or
+`.koda/hooks.json` (project). Events: `SessionStart`, `UserPromptSubmit`,
+`PreToolUse`, `PostToolUse`, `Stop`. Each hook receives a JSON event on stdin.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "bash", "command": "~/.koda/guard.sh" }
+    ]
+  }
+}
+```
+
+A `PreToolUse` hook can influence the call: exit `2` (or stdout
+`{"decision":"deny","reason":"…"}`) blocks it, `{"decision":"allow"}` bypasses
+the approval prompt, and `{"input":{…}}` rewrites the tool arguments (built-in
+tools only). `matcher` is a glob on the tool name (`*` = all).
+
 ## Development
 
 Branching model:
