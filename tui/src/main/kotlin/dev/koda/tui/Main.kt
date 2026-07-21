@@ -204,8 +204,8 @@ private fun KodaApp(
     StaticEffect { WelcomeBanner(model, provider, cwd, sessionId) }
     for (item in transcript) key(item.n) { StaticEffect { ItemView(item) } }
 
-    // Fall back to 80 when the terminal size isn't reported (Mosaic can return 0/tiny early).
-    val width = LocalTerminalState.current.size.width.let { if (it < 40) 80 else it }.coerceAtMost(200)
+    // Full terminal width; falls back to 80 only until the size is reported (updates on resize).
+    val width = LocalTerminalState.current.size.width.let { if (it <= 0) 80 else it }
     val blinkOn = (tick / 5) % 2 == 0
 
     Column(
@@ -281,7 +281,7 @@ private fun KodaApp(
                 }
             }
             Text(border(width, top = true), color = KodaColors.border)
-            Text(composerLine(width, input, cursor, blinkOn))
+            for (row in composerRows(width, input, cursor, blinkOn)) Text(row)
             Text(border(width, top = false), color = KodaColors.border)
         }
         Text(footer(model, contextLength, usedTokens, working, mode, SPINNER[tick % SPINNER.length]), color = KodaColors.dim)
@@ -325,24 +325,32 @@ private fun border(width: Int, top: Boolean): String {
     return l + "─".repeat((width - 2).coerceAtLeast(0)) + r
 }
 
-private fun composerLine(width: Int, input: String, cursor: Int, blinkOn: Boolean) = buildAnnotatedString {
+/**
+ * The composer rendered as one or more full-width box rows: "❯ " + input,
+ * soft-wrapped at the inner width, with a block cursor at its position. The
+ * box grows in height as the text wraps to more lines.
+ */
+private fun composerRows(width: Int, input: String, cursor: Int, blinkOn: Boolean): List<com.jakewharton.mosaic.text.AnnotatedString> {
     val inner = (width - 4).coerceAtLeast(8)
     val full = "❯ $input"
     val cursorAt = 2 + cursor
-    val start = (cursorAt - inner + 1).coerceAtLeast(0)
-    val visible = full.substring(start, minOf(full.length, start + inner))
-    val cursorIdx = cursorAt - start
-
-    append("│ ")
-    for (i in 0 until inner) {
-        val ch = if (i < visible.length) visible[i] else ' '
-        when {
-            i == cursorIdx && blinkOn -> { pushStyle(SpanStyle(textStyle = TextStyle.Invert)); append(ch); pop() }
-            i < 2 -> { pushStyle(SpanStyle(color = KodaColors.accent, textStyle = TextStyle.Bold)); append(ch); pop() }
-            else -> append(ch)
+    val rowCount = (full.length / inner) + 1 // room for the cursor at/after the end
+    return (0 until rowCount).map { row ->
+        val start = row * inner
+        buildAnnotatedString {
+            append("│ ")
+            for (i in 0 until inner) {
+                val idx = start + i
+                val ch = if (idx < full.length) full[idx] else ' '
+                when {
+                    idx == cursorAt && blinkOn -> { pushStyle(SpanStyle(textStyle = TextStyle.Invert)); append(ch); pop() }
+                    idx < 2 -> { pushStyle(SpanStyle(color = KodaColors.accent, textStyle = TextStyle.Bold)); append(ch); pop() }
+                    else -> append(ch)
+                }
+            }
+            append(" │")
         }
     }
-    append(" │")
 }
 
 private fun boxLine(width: Int, text: String): String {
