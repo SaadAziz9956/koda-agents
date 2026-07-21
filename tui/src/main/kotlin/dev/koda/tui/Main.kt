@@ -62,19 +62,20 @@ fun main(args: Array<String>) {
 
     KodaCore.create(config).use { core ->
         core.start()
-        runMosaicBlocking { KodaApp(core, sessionId, model, provider.name) }
+        runMosaicBlocking { KodaApp(core, sessionId, model, provider.name, config.cwd.toString()) }
     }
 }
 
 private sealed interface Item {
     val n: Int
+    data class User(override val n: Int, val text: String) : Item
     data class Assistant(override val n: Int, val text: String) : Item
     data class Tool(override val n: Int, val text: String, val error: Boolean) : Item
     data class Note(override val n: Int, val text: String, val color: Color) : Item
 }
 
 @Composable
-private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: String) {
+private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: String, cwd: String) {
     val scope = rememberCoroutineScope()
     val transcript = remember { mutableStateListOf<Item>() }
     var seq by remember { mutableStateOf(0) }
@@ -123,7 +124,8 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
         scope.launch { core.submit(ApprovalResponse(UUID.randomUUID().toString(), sessionId, p.approvalId, decision)) }
     }
 
-    // Committed transcript scrolls into terminal history; each item renders once.
+    // Welcome banner + committed transcript scroll into terminal history (each renders once).
+    StaticEffect { WelcomeBanner(model, provider, cwd, sessionId) }
     for (item in transcript) {
         key(item.n) { StaticEffect { ItemView(item) } }
     }
@@ -152,6 +154,7 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
                         text.isEmpty() -> {}
                         text == "/exit" || text == "/quit" || text == "exit" -> kotlin.system.exitProcess(0)
                         else -> {
+                            add(Item.User(seq, text))
                             history.add(text); historyIdx = history.size
                             working = true
                             scope.launch { core.submit(UserTurn(UUID.randomUUID().toString(), sessionId, text)) }
@@ -188,9 +191,32 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
 @Composable
 private fun ItemView(item: Item) {
     when (item) {
+        is Item.User -> Text("❯ " + item.text, color = KodaColors.accent, textStyle = TextStyle.Bold)
         is Item.Assistant -> MarkdownText(item.text)
         is Item.Tool -> Text("  " + item.text, color = if (item.error) KodaColors.err else KodaColors.tool)
         is Item.Note -> Text("  " + item.text, color = item.color)
+    }
+}
+
+@Composable
+private fun WelcomeBanner(model: String, provider: String, cwd: String, sessionId: String) {
+    val lines = listOf(
+        "koda",
+        "$model · $provider · session $sessionId",
+        cwd,
+        "type a message · Ctrl-C interrupts · /exit to quit",
+    )
+    val w = lines.maxOf { it.length } + 2
+    Column {
+        Text("╭" + "─".repeat(w) + "╮", color = KodaColors.accent)
+        lines.forEachIndexed { i, text ->
+            Text(
+                "│ " + text.padEnd(w - 1) + "│",
+                color = if (i == 0) KodaColors.accent else KodaColors.dim,
+                textStyle = if (i == 0) TextStyle.Bold else TextStyle.Unspecified,
+            )
+        }
+        Text("╰" + "─".repeat(w) + "╯", color = KodaColors.accent)
     }
 }
 
