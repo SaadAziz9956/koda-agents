@@ -43,11 +43,17 @@ class KoogEngine(
     private val model: LLModel,
     private val events: EventSink,
     private val maxIterationsPerTurn: Int,
+    private val hooks: HookRunner,
 ) {
     suspend fun runTurn(session: AgentSession, registry: ToolRegistry, text: String) {
         val turnId = UUID.randomUUID().toString()
         session.currentTurnId = turnId
         events.emit(TurnStarted(session.id, turnId))
+
+        if (!hooks.fireUserPromptSubmit(session.id, session.toolContext.cwd, text)) {
+            events.emit(TurnCompleted(session.id, turnId, TurnStopReason.COMPLETED))
+            return
+        }
 
         var stopReason = TurnStopReason.COMPLETED
         try {
@@ -96,6 +102,7 @@ class KoogEngine(
         }
 
         withContext(NonCancellable) {
+            hooks.fireStop(session.id, session.toolContext.cwd)
             events.emit(TurnCompleted(session.id, turnId, stopReason))
         }
     }

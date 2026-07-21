@@ -15,6 +15,8 @@ import dev.koda.core.adapter.ModePermissionPolicy
 import dev.koda.core.adapter.PromptFileSessionRepository
 import ai.koog.agents.core.tools.ToolRegistry
 import dev.koda.core.engine.DelegateTool
+import dev.koda.core.engine.HookLoader
+import dev.koda.core.engine.HookRunner
 import dev.koda.core.engine.KoogEngine
 import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
@@ -75,11 +77,14 @@ class KodaCore(
     private val _events = MutableSharedFlow<Event>(extraBufferCapacity = 4096)
     private val sessions = ConcurrentHashMap<String, SessionRuntime>()
 
+    private val hooks: HookRunner = HookLoader.load(config.kodaHome, config.cwd) { _events.emit(it) }
+
     private val engine = KoogEngine(
         executor = executor,
         model = model,
         events = { _events.emit(it) },
         maxIterationsPerTurn = config.maxIterationsPerTurn,
+        hooks = hooks,
     )
 
     private val mcpConnections = mutableListOf<McpConnection>()
@@ -160,6 +165,7 @@ class KodaCore(
         )
         val runtime = SessionRuntime(session)
         sessions[sessionId] = runtime
+        hooks.fireSessionStart(sessionId, config.cwd)
         _events.emit(
             SessionStarted(
                 sessionId,
@@ -179,7 +185,7 @@ class KodaCore(
 
     /** Orchestrates one session: serializes its work items, owns interrupt. */
     private inner class SessionRuntime(val session: AgentSession) {
-        private val gate = ToolGate(session) { _events.emit(it) }
+        private val gate = ToolGate(session, { _events.emit(it) }, hooks)
         private val delegate = ToolRegistry {
             tool(
                 DelegateTool(
