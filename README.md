@@ -25,11 +25,15 @@ Headless single turn:
 ./gradlew :cli:run -q --console=plain --args='-p "list the kotlin files here" --yolo'
 ```
 
-TUI (Mordant-rendered terminal surface — markdown replies, styled tool activity, status line):
+TUI (Mosaic-rendered terminal surface — Compose-for-terminal: markdown replies,
+scrolling transcript, pinned composer + status line, key-driven input):
 
 ```sh
 ./gradlew :tui:installDist -q && ./tui/build/install/tui/bin/tui
 ```
+
+Run the TUI in a **real terminal** — Mosaic repaints via ANSI control codes,
+which IDE/Gradle run consoles strip. Use the CLI (`:cli`) for IDE run windows.
 
 Daemon (WebSocket surface for other clients):
 

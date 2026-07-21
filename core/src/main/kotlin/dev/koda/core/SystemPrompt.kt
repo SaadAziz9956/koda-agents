@@ -2,11 +2,6 @@ package dev.koda.core
 
 import java.time.LocalDate
 
-/**
- * Assembles the session system prompt. Called exactly once per session:
- * the result must stay byte-stable for the session's lifetime so the
- * provider prompt cache holds (Koda design law #2).
- */
 object SystemPrompt {
 
     private const val MAX_SKILL_LINES = 150

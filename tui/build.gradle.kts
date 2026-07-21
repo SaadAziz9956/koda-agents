@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.compose)
     application
 }
 
@@ -10,15 +11,10 @@ kotlin {
 dependencies {
     implementation(project(":core"))
     implementation(libs.coroutines.core)
-    implementation(libs.mordant)
-    implementation(libs.mordant.markdown)
+    implementation(libs.mosaic.runtime)
     runtimeOnly(libs.slf4j.nop)
 }
 
 application {
     mainClass.set("dev.koda.tui.MainKt")
-}
-
-tasks.named<JavaExec>("run") {
-    standardInput = System.`in`
 }

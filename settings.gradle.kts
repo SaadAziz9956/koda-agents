@@ -10,6 +10,7 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
+        google() // Mosaic pulls transitive AndroidX/Compose artifacts hosted here
     }
 }
 
