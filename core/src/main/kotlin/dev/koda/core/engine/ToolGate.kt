@@ -1,6 +1,7 @@
 package dev.koda.core.engine
 
 import dev.koda.core.AgentSession
+import dev.koda.core.ContextFiles
 import dev.koda.protocol.ApprovalDecision
 import dev.koda.protocol.ApprovalRequest
 import dev.koda.protocol.Event
@@ -14,7 +15,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /** Emits protocol events to whoever is listening; the engine never knows who. */
 fun interface EventSink {
@@ -100,6 +103,24 @@ class ToolGate(
         val result = execute(effectiveArgs)
         events.emit(ToolEnd(session.id, session.currentTurnId, callId, toolName, result.output, result.isError))
         hooks.firePostToolUse(session.id, cwd, toolName, effectiveArgs, result.output, result.isError)
-        return if (result.isError) "ERROR: ${result.output}" else result.output
+        if (result.isError) return "ERROR: ${result.output}"
+        return result.output + subtreeContext(toolName, effectiveArgs)
+    }
+
+    /**
+     * When the agent reads a file in a subdirectory below cwd, surface that
+     * subtree's context files (once) by appending them to the tool result —
+     * NOT the frozen system prompt, so the prompt-cache prefix is unaffected.
+     */
+    private fun subtreeContext(toolName: String, args: JsonObject): String {
+        if (toolName != "read") return ""
+        val path = args["file_path"]?.jsonPrimitive?.contentOrNull ?: return ""
+        val touched = cwd.resolve(path)
+        val layers = ContextFiles.subtreeLayers(cwd, touched, session.toolContext.seenContextDirs)
+        if (layers.isEmpty()) return ""
+        return buildString {
+            append("\n\n--- context files for this subtree (apply while working here) ---")
+            layers.forEach { append("\n\n## ${it.label}\n${it.content}") }
+        }
     }
 }
