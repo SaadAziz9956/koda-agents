@@ -21,9 +21,14 @@ import dev.koda.core.engine.KoogEngine
 import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
+import dev.koda.core.engine.Sandbox
+import dev.koda.core.engine.SandboxPolicy
+import dev.koda.core.engine.SeatbeltShellExecutor
 import dev.koda.core.engine.gatedMcpRegistry
 import dev.koda.core.engine.kodaScopedRegistry
 import dev.koda.core.engine.kodaToolRegistry
+import dev.koda.tools.DirectShellExecutor
+import dev.koda.tools.ShellExecutor
 import dev.koda.core.port.PermissionPolicy
 import dev.koda.core.port.SessionRepository
 import dev.koda.protocol.ApprovalResponse
@@ -79,6 +84,18 @@ class KodaCore(
 
     private val hooks: HookRunner = HookLoader.load(config.kodaHome, config.cwd) { _events.emit(it) }
 
+    /** Sandboxed shell on macOS Seatbelt when the policy asks for it; else direct. */
+    private val shell: ShellExecutor = when {
+        config.sandbox == SandboxPolicy.DANGER_FULL_ACCESS -> DirectShellExecutor()
+        Sandbox.isMacSeatbeltAvailable() -> SeatbeltShellExecutor(config.sandbox)
+        else -> DirectShellExecutor()
+    }
+    private val sandboxNotice: String = when {
+        config.sandbox == SandboxPolicy.DANGER_FULL_ACCESS -> "sandbox: off (danger-full-access)"
+        Sandbox.isMacSeatbeltAvailable() -> "sandbox: seatbelt (${config.sandbox.name.lowercase()})"
+        else -> "sandbox: unavailable on this platform — shell runs unsandboxed"
+    }
+
     private val engine = KoogEngine(
         executor = executor,
         model = model,
@@ -93,6 +110,7 @@ class KodaCore(
     val events: SharedFlow<Event> get() = _events
 
     fun start(): Job = scope.launch {
+        _events.emit(dev.koda.protocol.Notice("", sandboxNotice))
         connectMcpServers()
         for (submission in submissions) {
             when (submission) {
@@ -193,7 +211,7 @@ class KodaCore(
                     model = model,
                     // Subagent tools are chosen per call (default read-only), gated by this session.
                     registryFor = { names ->
-                        kodaScopedRegistry(gate, names) + gatedMcpRegistry(mcpConnections, gate)
+                        kodaScopedRegistry(gate, shell, names) + gatedMcpRegistry(mcpConnections, gate)
                     },
                     events = { _events.emit(it) },
                     sessionId = session.id,
@@ -202,7 +220,7 @@ class KodaCore(
             )
         }
         private val registry =
-            kodaToolRegistry(gate) + delegate + gatedMcpRegistry(mcpConnections, gate)
+            kodaToolRegistry(gate, shell) + delegate + gatedMcpRegistry(mcpConnections, gate)
         private val workQueue = Channel<SessionWork>(Channel.UNLIMITED)
         @Volatile private var currentWork: Job? = null
 

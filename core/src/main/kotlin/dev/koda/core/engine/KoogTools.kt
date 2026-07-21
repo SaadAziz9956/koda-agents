@@ -79,7 +79,8 @@ class KoogEditTool(gate: ToolGate) : GatedTool<EditArgs>(typeToken<EditArgs>(), 
 @Serializable
 data class BashArgs(val command: String, val timeout: Int? = null)
 
-class KoogBashTool(gate: ToolGate) : GatedTool<BashArgs>(typeToken<BashArgs>(), BashTool(), gate) {
+class KoogBashTool(gate: ToolGate, executor: dev.koda.tools.ShellExecutor) :
+    GatedTool<BashArgs>(typeToken<BashArgs>(), BashTool(executor), gate) {
     override fun toJson(args: BashArgs): JsonObject = buildJsonObject {
         put("command", args.command)
         args.timeout?.let { put("timeout", it) }
@@ -126,13 +127,13 @@ class KoogTodoTool(gate: ToolGate) : GatedTool<TodoArgs>(typeToken<TodoArgs>(), 
 }
 
 /** The default Koda toolset as a per-session Koog registry. */
-fun kodaToolRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
+fun kodaToolRegistry(gate: ToolGate, shell: dev.koda.tools.ShellExecutor): ToolRegistry = ToolRegistry {
     tools(
         listOf(
             KoogReadTool(gate),
             KoogWriteTool(gate),
             KoogEditTool(gate),
-            KoogBashTool(gate),
+            KoogBashTool(gate, shell),
             KoogGrepTool(gate),
             KoogGlobTool(gate),
             KoogTodoTool(gate),
@@ -148,12 +149,12 @@ fun kodaToolRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
  * (so approvals apply), and `delegate` is never included, so subagents cannot
  * recurse. Unknown names are ignored.
  */
-fun kodaScopedRegistry(gate: ToolGate, names: List<String>? = null): ToolRegistry {
+fun kodaScopedRegistry(gate: ToolGate, shell: dev.koda.tools.ShellExecutor, names: List<String>? = null): ToolRegistry {
     val available = mapOf(
         "read" to { KoogReadTool(gate) },
         "write" to { KoogWriteTool(gate) },
         "edit" to { KoogEditTool(gate) },
-        "bash" to { KoogBashTool(gate) },
+        "bash" to { KoogBashTool(gate, shell) },
         "grep" to { KoogGrepTool(gate) },
         "glob" to { KoogGlobTool(gate) },
         "todo" to { KoogTodoTool(gate) },

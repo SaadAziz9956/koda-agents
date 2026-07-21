@@ -28,6 +28,7 @@ data class KodaConfig(
     val model: String,
     val cwd: Path,
     val permissionMode: PermissionMode = PermissionMode.DEFAULT,
+    val sandbox: dev.koda.core.engine.SandboxPolicy = dev.koda.core.engine.SandboxPolicy.WORKSPACE_WRITE,
     val maxIterationsPerTurn: Int = 50,
     val maxTokens: Int = 8192,
     val kodaHome: Path = System.getenv("KODA_HOME")?.let(Path::of)

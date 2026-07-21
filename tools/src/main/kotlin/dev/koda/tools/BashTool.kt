@@ -1,6 +1,5 @@
 package dev.koda.tools
 
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -9,7 +8,9 @@ private const val DEFAULT_TIMEOUT_MS = 120_000L
 private const val MAX_TIMEOUT_MS = 600_000L
 private const val MAX_OUTPUT_CHARS = 30_000
 
-class BashTool : KodaTool {
+class BashTool(
+    private val executor: ShellExecutor = DirectShellExecutor(),
+) : KodaTool {
     override val name = "bash"
     override val description =
         "Execute a shell command in the session working directory. " +
@@ -31,32 +32,17 @@ class BashTool : KodaTool {
             val timeoutMs = (args.optionalInt("timeout")?.toLong() ?: DEFAULT_TIMEOUT_MS)
                 .coerceIn(1_000L, MAX_TIMEOUT_MS)
 
-            val process = ProcessBuilder("/bin/bash", "-c", command)
-                .directory(ctx.cwd.toFile())
-                .redirectErrorStream(true)
-                .start()
-
-            val finished = try {
-                process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-            } catch (e: InterruptedException) {
-                process.destroyForcibly()
-                throw e
+            val result = executor.run(command, ctx.cwd, timeoutMs)
+            when {
+                result.timedOut -> ToolResult.error("Command timed out after ${timeoutMs}ms: $command")
+                else -> {
+                    val body = result.output.let {
+                        if (it.length > MAX_OUTPUT_CHARS) it.take(MAX_OUTPUT_CHARS) +
+                            "\n… (output truncated, ${it.length} chars total)" else it
+                    }.ifEmpty { "(no output)" }
+                    if (result.exitCode == 0) ToolResult(body)
+                    else ToolResult("Exit code ${result.exitCode}\n$body", isError = true)
+                }
             }
-
-            if (!finished) {
-                process.destroyForcibly()
-                return@withContext ToolResult.error("Command timed out after ${timeoutMs}ms: $command")
-            }
-
-            val output = process.inputStream.bufferedReader().readText()
-            val truncated = if (output.length > MAX_OUTPUT_CHARS) {
-                output.take(MAX_OUTPUT_CHARS) +
-                    "\n… (output truncated, ${output.length} chars total)"
-            } else output
-
-            val exitCode = process.exitValue()
-            val body = truncated.ifEmpty { "(no output)" }
-            if (exitCode == 0) ToolResult(body)
-            else ToolResult("Exit code $exitCode\n$body", isError = true)
         }
 }

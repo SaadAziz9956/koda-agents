@@ -41,9 +41,12 @@ class Handler(BaseHTTPRequestHandler):
         is_subagent = "sub-agent" in str(messages[0].get("content", "")).lower() if messages else False
 
         read_path = os.environ.get("KODA_MOCK_READ_PATH")
+        bash_cmd = os.environ.get("KODA_MOCK_BASH")
 
         if not has_tool_result:
-            if read_path and not is_subagent:
+            if bash_cmd and not is_subagent:
+                call = {"name": "bash", "arguments": json.dumps({"command": bash_cmd})}
+            elif read_path and not is_subagent:
                 # Test knob: read a specific path (to exercise subtree context loading).
                 call = {"name": "read", "arguments": json.dumps({"file_path": read_path})}
             elif is_subagent:
