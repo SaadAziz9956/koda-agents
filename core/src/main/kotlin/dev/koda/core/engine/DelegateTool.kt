@@ -12,7 +12,11 @@ import dev.koda.protocol.Notice
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class DelegateArgs(val task: String)
+data class DelegateArgs(
+    val task: String,
+    /** Tool names the subagent may use; omit for the default read-only set. */
+    val tools: List<String>? = null,
+)
 
 /**
  * Spawns a subagent: a fresh Koog agent with its own conversation and a
@@ -28,7 +32,7 @@ data class DelegateArgs(val task: String)
 class DelegateTool(
     private val executor: PromptExecutor,
     private val model: LLModel,
-    private val scopedRegistry: ToolRegistry,
+    private val registryFor: (List<String>?) -> ToolRegistry,
     private val events: EventSink,
     private val sessionId: String,
     private val maxIterations: Int,
@@ -36,12 +40,14 @@ class DelegateTool(
     argsType = typeToken<DelegateArgs>(),
     name = "delegate",
     description =
-        "Delegate a focused, read-only investigation to a subagent (e.g. \"find where " +
-        "X is configured and summarize how it works\"). The subagent explores on its own " +
-        "and returns only its findings. Use it to keep your own context focused when a " +
-        "sub-question needs many file reads or searches.",
+        "Delegate a focused investigation to a subagent (e.g. \"find where X is configured " +
+        "and summarize how it works\"). The subagent explores on its own and returns only its " +
+        "findings, keeping your context focused. By default it gets read-only tools " +
+        "(read, grep, glob, skill); pass `tools` to grant a specific set (e.g. [\"read\",\"bash\"]) " +
+        "— mutating tools still require the usual approval.",
 ) {
     override suspend fun execute(args: DelegateArgs): String {
+        val scopedRegistry = registryFor(args.tools)
         events.emit(Notice(sessionId, "⤷ delegating: ${args.task.take(120)}"))
 
         val strategy = functionalStrategy<String, String>("koda-subagent") { input ->

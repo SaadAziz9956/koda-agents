@@ -142,16 +142,25 @@ fun kodaToolRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
 }
 
 /**
- * Read-only exploration toolset for subagents: read, grep, glob, skill.
- * No write/edit/bash and no delegate, so subagents can't mutate or recurse.
+ * Subagent toolset. With [names] null, the default read-only exploration set
+ * (read, grep, glob, skill). Otherwise the named subset of the built-in tools
+ * — mutating tools are allowed but still pass through the session [ToolGate]
+ * (so approvals apply), and `delegate` is never included, so subagents cannot
+ * recurse. Unknown names are ignored.
  */
-fun kodaExploreRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
-    tools(
-        listOf(
-            KoogReadTool(gate),
-            KoogGrepTool(gate),
-            KoogGlobTool(gate),
-            KoogSkillTool(gate),
-        )
+fun kodaScopedRegistry(gate: ToolGate, names: List<String>? = null): ToolRegistry {
+    val available = mapOf(
+        "read" to { KoogReadTool(gate) },
+        "write" to { KoogWriteTool(gate) },
+        "edit" to { KoogEditTool(gate) },
+        "bash" to { KoogBashTool(gate) },
+        "grep" to { KoogGrepTool(gate) },
+        "glob" to { KoogGlobTool(gate) },
+        "todo" to { KoogTodoTool(gate) },
+        "skill" to { KoogSkillTool(gate) },
     )
+    val selected = names?.map { it.lowercase() }?.filter { it in available }?.distinct()
+        ?.takeIf { it.isNotEmpty() }
+        ?: listOf("read", "grep", "glob", "skill")
+    return ToolRegistry { tools(selected.map { available.getValue(it)() }) }
 }

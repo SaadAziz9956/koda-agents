@@ -22,7 +22,7 @@ import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
 import dev.koda.core.engine.gatedMcpRegistry
-import dev.koda.core.engine.kodaExploreRegistry
+import dev.koda.core.engine.kodaScopedRegistry
 import dev.koda.core.engine.kodaToolRegistry
 import dev.koda.core.port.PermissionPolicy
 import dev.koda.core.port.SessionRepository
@@ -191,8 +191,10 @@ class KodaCore(
                 DelegateTool(
                     executor = executor,
                     model = model,
-                    // Subagents explore with read-only tools, gated by this session.
-                    scopedRegistry = kodaExploreRegistry(gate) + gatedMcpRegistry(mcpConnections, gate),
+                    // Subagent tools are chosen per call (default read-only), gated by this session.
+                    registryFor = { names ->
+                        kodaScopedRegistry(gate, names) + gatedMcpRegistry(mcpConnections, gate)
+                    },
                     events = { _events.emit(it) },
                     sessionId = session.id,
                     maxIterations = config.maxIterationsPerTurn,
