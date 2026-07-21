@@ -1,20 +1,15 @@
 package dev.koda.core
 
-import java.nio.file.Path
 import java.time.LocalDate
-import kotlin.io.path.exists
-import kotlin.io.path.readText
 
 /**
  * Assembles the session system prompt. Called exactly once per session:
  * the result must stay byte-stable for the session's lifetime so the
- * provider prompt cache holds (Koda design law #1).
+ * provider prompt cache holds (Koda design law #2).
  */
 object SystemPrompt {
 
-    private const val MAX_CONTEXT_FILE_CHARS = 20_000
     private const val MAX_SKILL_LINES = 150
-    private val CONTEXT_FILE_NAMES = listOf("KODA.md", "AGENTS.md", "CLAUDE.md")
 
     fun build(config: KodaConfig, skills: Map<String, dev.koda.tools.LoadedSkill> = emptyMap()): String = buildString {
         appendLine(
@@ -39,10 +34,19 @@ object SystemPrompt {
         appendLine("Date: ${LocalDate.now()}")
         appendLine("Model: ${config.model} (${config.provider.name})")
 
-        projectContext(config.cwd)?.let { (name, content) ->
+        val contextLayers = ContextFiles.load(config.kodaHome, config.cwd)
+        if (contextLayers.isNotEmpty()) {
             appendLine()
-            appendLine("# Project context ($name)")
-            appendLine(content)
+            appendLine("# Project context")
+            appendLine(
+                "Instructions from context files, broadest first; where they conflict, " +
+                    "the most specific (listed last) takes precedence."
+            )
+            contextLayers.forEach { layer ->
+                appendLine()
+                appendLine("## ${layer.label}")
+                appendLine(layer.content)
+            }
         }
 
         if (skills.isNotEmpty()) {
@@ -59,23 +63,5 @@ object SystemPrompt {
                 appendLine("… and ${skills.size - MAX_SKILL_LINES} more (any can be loaded by name)")
             }
         }
-    }
-
-    /** First matching context file walking from cwd up to the git root (or filesystem root). */
-    private fun projectContext(cwd: Path): Pair<String, String>? {
-        var dir: Path? = cwd
-        while (dir != null) {
-            for (name in CONTEXT_FILE_NAMES) {
-                val file = dir.resolve(name)
-                if (file.exists()) {
-                    val text = file.readText().take(MAX_CONTEXT_FILE_CHARS)
-                    return name to text
-                }
-            }
-            // Stop at the repository boundary.
-            if (dir.resolve(".git").exists()) break
-            dir = dir.parent
-        }
-        return null
     }
 }
