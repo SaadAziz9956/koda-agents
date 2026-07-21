@@ -22,6 +22,7 @@ import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
 import dev.koda.core.engine.BwrapShellExecutor
+import dev.koda.core.engine.EscalatedShellExecutor
 import dev.koda.core.engine.EscalatingShellExecutor
 import dev.koda.core.engine.Sandbox
 import dev.koda.core.engine.SandboxPolicy
@@ -224,7 +225,8 @@ class KodaCore(
         else BwrapShellExecutor(config.sandbox)
         return EscalatingShellExecutor(
             sandboxed = sandboxed,
-            direct = DirectShellExecutor(),
+            // Escalation widens writes + network but NEVER exposes secrets.
+            direct = EscalatedShellExecutor(),
             approveEscalation = { cmd -> approveEscalation(session, cmd) },
         )
     }

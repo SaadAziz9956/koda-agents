@@ -27,12 +27,29 @@ class DirectShellExecutor : ShellExecutor {
         runProcess(listOf("/bin/bash", "-c", command), cwd, timeoutMs)
 }
 
+/**
+ * Env var names the agent's shell must never see — the harness's own
+ * provider keys and common cloud/CI secrets. Matched case-insensitively as
+ * substrings, so `ANTHROPIC_API_KEY`, `AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`,
+ * etc. are all stripped. A secret can't be exfiltrated if it isn't there.
+ */
+private val SECRET_ENV_MARKERS =
+    listOf("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL", "ACCESS_KEY", "PRIVATE_KEY")
+
+internal fun stripSecretEnv(env: MutableMap<String, String>) {
+    env.keys.filter { key ->
+        val u = key.uppercase()
+        SECRET_ENV_MARKERS.any { u.contains(it) } || u.startsWith("AWS_") || u.startsWith("KODA_")
+    }.toList().forEach { env.remove(it) }
+}
+
 /** Shared process launcher used by both direct and sandboxed executors. */
 fun runProcess(argv: List<String>, cwd: Path, timeoutMs: Long): ShellResult {
-    val process = ProcessBuilder(argv)
+    val builder = ProcessBuilder(argv)
         .directory(cwd.toFile())
         .redirectErrorStream(true)
-        .start()
+    stripSecretEnv(builder.environment())
+    val process = builder.start()
     val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
     if (!finished) {
         process.destroyForcibly()

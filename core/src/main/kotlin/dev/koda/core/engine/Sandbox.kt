@@ -46,6 +46,36 @@ object Sandbox {
         listOf(SEATBELT, "-p", profile(cwd, policy), "--", "/bin/bash", "-c", command)
 
     /**
+     * Escalation profile: writes and network are allowed (what an approved
+     * escalation needs), but secret reads stay denied — secrets are a hard
+     * floor that escalation never lifts.
+     */
+    fun escalatedSeatbeltArgv(command: String, cwd: Path): List<String> {
+        val p = buildString {
+            appendLine("(version 1)")
+            appendLine("(allow default)")
+            appendLine(secretReadDenies())
+        }
+        return listOf(SEATBELT, "-p", p, "--", "/bin/bash", "-c", command)
+    }
+
+    /** Bubblewrap escalation: writable root + network, but secrets still masked. */
+    fun escalatedBwrapArgv(command: String, cwd: Path): List<String> {
+        val bwrap = bwrapPath() ?: error("bwrap not available")
+        val root = canonical(cwd)
+        return buildList {
+            add(bwrap)
+            add("--bind"); add("/"); add("/") // writable root (escalation)
+            add("--dev"); add("/dev"); add("--proc"); add("/proc")
+            add("--unshare-user"); add("--unshare-pid"); add("--die-with-parent")
+            add("--chdir"); add(root)
+            addAll(bwrapSecretMasks(root)) // secrets stay masked
+            // network allowed (no --unshare-net)
+            add("--"); add("/bin/bash"); add("-c"); add(command)
+        }
+    }
+
+    /**
      * Builds the bubblewrap argv for Linux: read-only root, cwd (and temp)
      * bound writable under workspace-write, `.git` re-bound read-only, and the
      * network namespace unshared (network denied). Mirrors the Seatbelt policy.
@@ -69,10 +99,26 @@ object Sandbox {
                 val git = "$root/.git"
                 if (java.io.File(git).exists()) { add("--ro-bind"); add(git); add(git) }
             }
-            // READ_ONLY: no writable binds. Both non-danger policies deny network:
+            addAll(bwrapSecretMasks(root))
+            // Both non-danger policies deny network:
             add("--unshare-net")
             add("--"); add("/bin/bash"); add("-c"); add(command)
         }
+    }
+
+    /** Home-relative paths whose contents must never be read by a tool. */
+    private val SECRET_SUBPATHS = listOf(
+        ".ssh", ".aws", ".gnupg", ".config/gcloud", ".kube", ".docker",
+        ".netrc", ".npmrc", ".pypirc", ".git-credentials", ".config/koda", ".koda",
+    )
+
+    /** Deny-read SBPL for secrets: cloud/SSH/credential dirs + any `.env` file. */
+    private fun secretReadDenies(): String {
+        val home = canonical(Path.of(System.getProperty("user.home")))
+        val subpaths = SECRET_SUBPATHS.joinToString("\n") { """(deny file-read* (subpath "$home/$it"))""" }
+        // Any path ending in /.env or /.env.<something>, anywhere (incl. the workspace).
+        val envRegex = """(deny file-read* (regex #"/\.env(\.[^/]*)?$"))"""
+        return "$subpaths\n$envRegex"
     }
 
     private fun profile(cwd: Path, policy: SandboxPolicy): String {
@@ -94,9 +140,21 @@ object Sandbox {
             appendLine("(version 1)")
             appendLine("(allow default)")
             appendLine("(deny network*)")
+            if (policy != SandboxPolicy.DANGER_FULL_ACCESS) appendLine(secretReadDenies())
             appendLine("(deny file-write*)")
             if (writes.isNotEmpty()) appendLine(writes)
         }
+    }
+
+    /** bwrap args that mask secret dirs (empty tmpfs) and files (/dev/null). */
+    private fun bwrapSecretMasks(root: String): List<String> = buildList {
+        val home = System.getProperty("user.home")
+        for (sub in SECRET_SUBPATHS) {
+            val p = "$home/$sub"
+            if (java.io.File(p).isDirectory) { add("--tmpfs"); add(p) }
+            else if (java.io.File(p).exists()) { add("--ro-bind"); add("/dev/null"); add(p) }
+        }
+        java.io.File("$root/.env").takeIf { it.exists() }?.let { add("--ro-bind"); add("/dev/null"); add("$root/.env") }
     }
 
     private fun canonical(p: Path): String =
@@ -134,6 +192,22 @@ class BwrapShellExecutor(private val policy: SandboxPolicy) : ShellExecutor {
     override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult =
         runProcess(Sandbox.bwrapArgv(command, cwd, policy), cwd, timeoutMs)
             .let { it.copy(sandboxDenied = looksSandboxDenied(it)) }
+}
+
+/**
+ * The escalation target: a relaxed sandbox that allows writes + network but
+ * still denies secret reads (and env stays stripped via runProcess). Escalation
+ * widens access without ever exposing secrets — secrets are a hard floor.
+ */
+class EscalatedShellExecutor : ShellExecutor {
+    override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult {
+        val argv = when {
+            Sandbox.isMacSeatbeltAvailable() -> Sandbox.escalatedSeatbeltArgv(command, cwd)
+            Sandbox.isLinuxBwrapAvailable() -> Sandbox.escalatedBwrapArgv(command, cwd)
+            else -> listOf("/bin/bash", "-c", command)
+        }
+        return runProcess(argv, cwd, timeoutMs)
+    }
 }
 
 /** Heuristic: does a failed command look blocked by the sandbox (vs a normal error)? */
