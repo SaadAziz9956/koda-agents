@@ -126,7 +126,9 @@ object ContextFiles {
         val abs = file.toAbsolutePath().normalize()
         if (abs in visited) return null
         val raw = runCatching { file.readText() }.getOrNull() ?: return null
-        val expanded = expandImports(raw, abs.parent, depth, visited + abs)
+        // Strip covert payloads (invisible chars, hidden HTML comments) — even a
+        // trusted-looking AGENTS.md from a cloned repo can hide injected text.
+        val expanded = Sanitizer.clean(expandImports(raw, abs.parent, depth, visited + abs))
         return expanded.trim().takeIf { it.isNotEmpty() }
     }
 

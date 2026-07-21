@@ -87,9 +87,15 @@ class ToolGate(
             PreToolDecision.Proceed -> {}
         }
 
-        if (!autoAllow && session.permissions.needsApproval(toolName, mutating)) {
+        // A dangerous shell command forces approval regardless of mode (guardrail).
+        val danger = if (toolName == "bash") {
+            DangerousCommands.match(effectiveArgs["command"]?.jsonPrimitive?.contentOrNull ?: "")
+        } else null
+
+        if (danger != null || (!autoAllow && session.permissions.needsApproval(toolName, mutating))) {
             val approvalId = UUID.randomUUID().toString()
-            events.emit(ApprovalRequest(session.id, approvalId, toolName, summary, effectiveArgs.toString()))
+            val shownSummary = if (danger != null) "⚠ DANGEROUS ($danger): $summary" else summary
+            events.emit(ApprovalRequest(session.id, approvalId, toolName, shownSummary, effectiveArgs.toString()))
             when (session.approvals.await(approvalId)) {
                 ApprovalDecision.DENY ->
                     return "DENIED: the user denied this tool call. Ask before retrying it."

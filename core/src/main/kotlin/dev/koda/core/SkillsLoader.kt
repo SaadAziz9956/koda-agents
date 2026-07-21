@@ -43,8 +43,9 @@ object SkillsLoader {
         val description = frontmatterValue(frontmatter, "description") ?: ""
         LoadedSkill(
             name = name,
-            description = description,
-            body = body.trim(),
+            description = Sanitizer.clean(description),
+            // Skills are third-party (177 imported) — sanitize and flag injection.
+            body = Sanitizer.sanitizeUntrusted(body.trim(), "skill"),
             dir = file.parent.toString(),
         )
     }.getOrNull()
