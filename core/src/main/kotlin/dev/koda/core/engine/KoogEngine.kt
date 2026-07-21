@@ -44,6 +44,8 @@ class KoogEngine(
     private val events: EventSink,
     private val maxIterationsPerTurn: Int,
     private val hooks: HookRunner,
+    /** Fired (non-blocking) after a successful turn with (sessionId, userInput, assistantText). */
+    private val onTurnCompleted: (suspend (String, String, String) -> Unit)? = null,
 ) {
     suspend fun runTurn(session: AgentSession, registry: ToolRegistry, text: String) {
         val turnId = UUID.randomUUID().toString()
@@ -90,8 +92,9 @@ class KoogEngine(
                 response.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
             }
 
-            newAgent(session, registry, strategy = strategy).run(text)
+            val finalText = newAgent(session, registry, strategy = strategy).run(text)
             session.persist()
+            onTurnCompleted?.invoke(session.id, text, finalText) // non-blocking: launches background review
         } catch (e: CancellationException) {
             stopReason = TurnStopReason.INTERRUPTED
         } catch (e: Exception) {

@@ -43,8 +43,22 @@ class Handler(BaseHTTPRequestHandler):
         read_path = os.environ.get("KODA_MOCK_READ_PATH")
         bash_cmd = os.environ.get("KODA_MOCK_BASH")
         memory_note = os.environ.get("KODA_MOCK_MEMORY")
+        create_skill = os.environ.get("KODA_MOCK_CREATE_SKILL")
+
+        # The background memory reviewer: return one durable fact.
+        sysmsg = str(messages[0].get("content", "")) if messages and messages[0].get("role") == "system" else ""
+        if "memory reviewer" in sysmsg:
+            self._respond({"role": "assistant", "content": "USER: The user is testing Koda's learning loop."}, "stop", stream, body)
+            return
 
         if not has_tool_result:
+            if create_skill and not is_subagent:
+                call = {"name": "skill_create", "arguments": json.dumps(
+                    {"name": create_skill, "description": "a test skill", "body": "# Test\nStep 1.\n"})}
+                message = {"role": "assistant", "content": None, "tool_calls": [
+                    {"id": "call_1", "type": "function", "function": call}]}
+                self._respond(message, "tool_calls", stream, body)
+                return
             if memory_note and not is_subagent:
                 call = {"name": "memory", "arguments": json.dumps({"content": memory_note, "scope": "user"})}
             elif bash_cmd and not is_subagent:
@@ -75,17 +89,17 @@ class Handler(BaseHTTPRequestHandler):
                        "content": f"Found {count} Gradle script files in this project."}
             finish = "stop"
 
-        usage = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
+        self._respond(message, finish, stream, body)
 
+    def _respond(self, message, finish, stream, body):
+        usage = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
         if stream:
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
             delta = dict(message)
             if "tool_calls" in delta:
-                delta["tool_calls"] = [
-                    {**c, "index": i} for i, c in enumerate(delta["tool_calls"])
-                ]
+                delta["tool_calls"] = [{**c, "index": i} for i, c in enumerate(delta["tool_calls"])]
             self.wfile.write(sse({"id": "cmpl-1", "object": "chat.completion.chunk",
                                   "created": 1700000000, "model": body.get("model", "mock-1"),
                                   "choices": [{"index": 0, "delta": delta, "finish_reason": None}]}))
@@ -98,8 +112,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.dumps({
                 "id": "cmpl-1", "object": "chat.completion", "created": 1700000000,
                 "model": body.get("model", "mock-1"),
-                "choices": [{"index": 0, "message": message, "finish_reason": finish,
-                             "logprobs": None}],
+                "choices": [{"index": 0, "message": message, "finish_reason": finish, "logprobs": None}],
                 "usage": usage,
             }).encode()
             self.send_response(200)

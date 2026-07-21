@@ -97,17 +97,25 @@ class KodaCore(
         else -> "sandbox: unavailable (no seatbelt/bwrap) — shell runs unsandboxed"
     }
 
+    private val mcpConnections = mutableListOf<McpConnection>()
+    private val skills = SkillsLoader.load(config.kodaHome, config.cwd)
+    private val memory = dev.koda.core.adapter.FileMemoryStore(config.kodaHome, config.cwd)
+    private val skillWriter = dev.koda.core.adapter.FileSkillWriter(config.kodaHome)
+    private val reviewer = if (config.autoMemory) dev.koda.core.engine.MemoryReviewer(executor, model) else null
+
     private val engine = KoogEngine(
         executor = executor,
         model = model,
         events = { _events.emit(it) },
         maxIterationsPerTurn = config.maxIterationsPerTurn,
         hooks = hooks,
+        onTurnCompleted = { sessionId, userText, assistantText ->
+            // Fire-and-forget background review; never blocks the turn.
+            reviewer?.let { r ->
+                scope.launch { r.reviewAndSave(sessionId, userText, assistantText, memory) { _events.emit(it) } }
+            }
+        },
     )
-
-    private val mcpConnections = mutableListOf<McpConnection>()
-    private val skills = SkillsLoader.load(config.kodaHome, config.cwd)
-    private val memory = dev.koda.core.adapter.FileMemoryStore(config.kodaHome, config.cwd)
 
     val events: SharedFlow<Event> get() = _events
 
@@ -252,7 +260,7 @@ class KodaCore(
             )
         }
         private val registry =
-            kodaToolRegistry(gate, shell, memory) + delegate + gatedMcpRegistry(mcpConnections, gate)
+            kodaToolRegistry(gate, shell, memory, skillWriter) + delegate + gatedMcpRegistry(mcpConnections, gate)
         private val workQueue = Channel<SessionWork>(Channel.UNLIMITED)
         @Volatile private var currentWork: Job? = null
 
