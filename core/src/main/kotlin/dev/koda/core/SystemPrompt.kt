@@ -6,7 +6,13 @@ object SystemPrompt {
 
     private const val MAX_SKILL_LINES = 150
 
-    fun build(config: KodaConfig, skills: Map<String, dev.koda.tools.LoadedSkill> = emptyMap()): String = buildString {
+    private const val MAX_MEMORY_CHARS = 4_000
+
+    fun build(
+        config: KodaConfig,
+        skills: Map<String, dev.koda.tools.LoadedSkill> = emptyMap(),
+        memory: dev.koda.tools.MemoryStore? = null,
+    ): String = buildString {
         appendLine(
             """
             You are Koda, an autonomous personal agent running on the user's machine.
@@ -28,6 +34,21 @@ object SystemPrompt {
         appendLine("Platform: ${System.getProperty("os.name")} ${System.getProperty("os.arch")}")
         appendLine("Date: ${LocalDate.now()}")
         appendLine("Model: ${config.model} (${config.provider.name})")
+
+        if (memory != null) {
+            val user = memory.load(dev.koda.tools.MemoryScope.USER).take(MAX_MEMORY_CHARS)
+            val project = memory.load(dev.koda.tools.MemoryScope.PROJECT).take(MAX_MEMORY_CHARS)
+            if (user.isNotEmpty() || project.isNotEmpty()) {
+                appendLine()
+                appendLine("# Memory")
+                appendLine(
+                    "Durable facts you've saved. Keep using the memory tool to record new " +
+                        "lasting facts (user preferences → user scope; project facts → project scope)."
+                )
+                if (user.isNotEmpty()) { appendLine(); appendLine("## About the user"); appendLine(user) }
+                if (project.isNotEmpty()) { appendLine(); appendLine("## About this project"); appendLine(project) }
+            }
+        }
 
         val contextLayers = ContextFiles.load(config.kodaHome, config.cwd)
         if (contextLayers.isNotEmpty()) {

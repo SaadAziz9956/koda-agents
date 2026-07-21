@@ -9,6 +9,8 @@ import dev.koda.tools.EditTool
 import dev.koda.tools.GlobTool
 import dev.koda.tools.GrepTool
 import dev.koda.tools.KodaTool
+import dev.koda.tools.MemoryStore
+import dev.koda.tools.MemoryTool
 import dev.koda.tools.ReadTool
 import dev.koda.tools.SkillTool
 import dev.koda.tools.TodoTool
@@ -118,6 +120,18 @@ class KoogSkillTool(gate: ToolGate) : GatedTool<SkillArgs>(typeToken<SkillArgs>(
 }
 
 @Serializable
+data class MemoryArgs(val content: String, val scope: String? = null, val action: String? = null)
+
+class KoogMemoryTool(gate: ToolGate, store: MemoryStore) :
+    GatedTool<MemoryArgs>(typeToken<MemoryArgs>(), MemoryTool(store), gate) {
+    override fun toJson(args: MemoryArgs): JsonObject = buildJsonObject {
+        put("content", args.content)
+        args.scope?.let { put("scope", it) }
+        args.action?.let { put("action", it) }
+    }
+}
+
+@Serializable
 data class TodoArgs(val items: List<String>)
 
 class KoogTodoTool(gate: ToolGate) : GatedTool<TodoArgs>(typeToken<TodoArgs>(), TodoTool(), gate) {
@@ -127,20 +141,22 @@ class KoogTodoTool(gate: ToolGate) : GatedTool<TodoArgs>(typeToken<TodoArgs>(), 
 }
 
 /** The default Koda toolset as a per-session Koog registry. */
-fun kodaToolRegistry(gate: ToolGate, shell: dev.koda.tools.ShellExecutor): ToolRegistry = ToolRegistry {
-    tools(
-        listOf(
-            KoogReadTool(gate),
-            KoogWriteTool(gate),
-            KoogEditTool(gate),
-            KoogBashTool(gate, shell),
-            KoogGrepTool(gate),
-            KoogGlobTool(gate),
-            KoogTodoTool(gate),
-            KoogSkillTool(gate),
+fun kodaToolRegistry(gate: ToolGate, shell: dev.koda.tools.ShellExecutor, memory: MemoryStore): ToolRegistry =
+    ToolRegistry {
+        tools(
+            listOf(
+                KoogReadTool(gate),
+                KoogWriteTool(gate),
+                KoogEditTool(gate),
+                KoogBashTool(gate, shell),
+                KoogGrepTool(gate),
+                KoogGlobTool(gate),
+                KoogTodoTool(gate),
+                KoogSkillTool(gate),
+                KoogMemoryTool(gate, memory),
+            )
         )
-    )
-}
+    }
 
 /**
  * Subagent toolset. With [names] null, the default read-only exploration set

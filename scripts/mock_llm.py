@@ -42,9 +42,12 @@ class Handler(BaseHTTPRequestHandler):
 
         read_path = os.environ.get("KODA_MOCK_READ_PATH")
         bash_cmd = os.environ.get("KODA_MOCK_BASH")
+        memory_note = os.environ.get("KODA_MOCK_MEMORY")
 
         if not has_tool_result:
-            if bash_cmd and not is_subagent:
+            if memory_note and not is_subagent:
+                call = {"name": "memory", "arguments": json.dumps({"content": memory_note, "scope": "user"})}
+            elif bash_cmd and not is_subagent:
                 call = {"name": "bash", "arguments": json.dumps({"command": bash_cmd})}
             elif read_path and not is_subagent:
                 # Test knob: read a specific path (to exercise subtree context loading).

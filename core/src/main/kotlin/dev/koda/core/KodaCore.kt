@@ -107,6 +107,7 @@ class KodaCore(
 
     private val mcpConnections = mutableListOf<McpConnection>()
     private val skills = SkillsLoader.load(config.kodaHome, config.cwd)
+    private val memory = dev.koda.core.adapter.FileMemoryStore(config.kodaHome, config.cwd)
 
     val events: SharedFlow<Event> get() = _events
 
@@ -176,7 +177,7 @@ class KodaCore(
         sessions[sessionId]?.let { return it }
         val session = AgentSession(
             id = sessionId,
-            systemPrompt = SystemPrompt.build(config, skills),
+            systemPrompt = SystemPrompt.build(config, skills, memory),
             toolContext = ToolContext(config.cwd).apply { this.skills.putAll(this@KodaCore.skills) },
             permissions = permissionPolicyFactory(),
             approvals = ApprovalBroker(),
@@ -251,7 +252,7 @@ class KodaCore(
             )
         }
         private val registry =
-            kodaToolRegistry(gate, shell) + delegate + gatedMcpRegistry(mcpConnections, gate)
+            kodaToolRegistry(gate, shell, memory) + delegate + gatedMcpRegistry(mcpConnections, gate)
         private val workQueue = Channel<SessionWork>(Channel.UNLIMITED)
         @Volatile private var currentWork: Job? = null
 
