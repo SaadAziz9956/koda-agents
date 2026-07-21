@@ -13,11 +13,14 @@ import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import dev.koda.core.adapter.ModePermissionPolicy
 import dev.koda.core.adapter.PromptFileSessionRepository
+import ai.koog.agents.core.tools.ToolRegistry
+import dev.koda.core.engine.DelegateTool
 import dev.koda.core.engine.KoogEngine
 import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
 import dev.koda.core.engine.gatedMcpRegistry
+import dev.koda.core.engine.kodaExploreRegistry
 import dev.koda.core.engine.kodaToolRegistry
 import dev.koda.core.port.PermissionPolicy
 import dev.koda.core.port.SessionRepository
@@ -60,7 +63,7 @@ import kotlinx.coroutines.launch
  */
 class KodaCore(
     private val config: KodaConfig,
-    executor: PromptExecutor,
+    private val executor: PromptExecutor,
     private val model: LLModel,
     private val repository: SessionRepository,
     private val permissionPolicyFactory: () -> PermissionPolicy =
@@ -177,7 +180,21 @@ class KodaCore(
     /** Orchestrates one session: serializes its work items, owns interrupt. */
     private inner class SessionRuntime(val session: AgentSession) {
         private val gate = ToolGate(session) { _events.emit(it) }
-        private val registry = kodaToolRegistry(gate) + gatedMcpRegistry(mcpConnections, gate)
+        private val delegate = ToolRegistry {
+            tool(
+                DelegateTool(
+                    executor = executor,
+                    model = model,
+                    // Subagents explore with read-only tools, gated by this session.
+                    scopedRegistry = kodaExploreRegistry(gate) + gatedMcpRegistry(mcpConnections, gate),
+                    events = { _events.emit(it) },
+                    sessionId = session.id,
+                    maxIterations = config.maxIterationsPerTurn,
+                )
+            )
+        }
+        private val registry =
+            kodaToolRegistry(gate) + delegate + gatedMcpRegistry(mcpConnections, gate)
         private val workQueue = Channel<SessionWork>(Channel.UNLIMITED)
         @Volatile private var currentWork: Job? = null
 

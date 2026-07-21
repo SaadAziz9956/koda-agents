@@ -32,8 +32,16 @@ class Handler(BaseHTTPRequestHandler):
         )
         skill_match = re.search(r"'([\w-]+)' skill", user_text)
 
+        is_subagent = "sub-agent" in str(messages[0].get("content", "")).lower() if messages else False
+
         if not has_tool_result:
-            if skill_match:
+            if is_subagent:
+                # Subagent: do one read-only search, then (next turn) summarize.
+                call = {"name": "glob", "arguments": "{\"pattern\": \"**/*.kt\"}"}
+            elif "delegate" in user_text.lower():
+                call = {"name": "delegate",
+                        "arguments": json.dumps({"task": "find the kotlin files and count them"})}
+            elif skill_match:
                 call = {"name": "skill",
                         "arguments": json.dumps({"name": skill_match.group(1)})}
             elif "echo" in user_text.lower():

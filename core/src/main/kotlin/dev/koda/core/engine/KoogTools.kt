@@ -140,3 +140,18 @@ fun kodaToolRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
         )
     )
 }
+
+/**
+ * Read-only exploration toolset for subagents: read, grep, glob, skill.
+ * No write/edit/bash and no delegate, so subagents can't mutate or recurse.
+ */
+fun kodaExploreRegistry(gate: ToolGate): ToolRegistry = ToolRegistry {
+    tools(
+        listOf(
+            KoogReadTool(gate),
+            KoogGrepTool(gate),
+            KoogGlobTool(gate),
+            KoogSkillTool(gate),
+        )
+    )
+}
