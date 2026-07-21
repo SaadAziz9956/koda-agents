@@ -88,4 +88,5 @@ object KodaColors {
     val warn = Color.Yellow
     val dim = gray
     val accent = Color.Cyan
+    val border = Color(0.45f, 0.45f, 0.55f)
 }

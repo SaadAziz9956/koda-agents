@@ -9,12 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.jakewharton.mosaic.LocalStaticLogger
+import com.jakewharton.mosaic.LocalTerminalState
 import com.jakewharton.mosaic.StaticEffect
-import com.jakewharton.mosaic.layout.KeyEvent
 import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.runMosaicBlocking
+import com.jakewharton.mosaic.text.SpanStyle
+import com.jakewharton.mosaic.text.buildAnnotatedString
 import com.jakewharton.mosaic.ui.Color
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Text
@@ -41,13 +42,15 @@ import dev.koda.protocol.TurnStopReason
 import dev.koda.protocol.UserTurn
 import java.nio.file.Path
 import java.util.UUID
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Koda's Mosaic TUI surface. A thin client of [KodaCore] over the protocol:
- * finished transcript items scroll into history via [StaticEffect]; a status
- * line and input composer stay pinned in the live frame. Renders only in a
- * real terminal (Mosaic repaints via ANSI, which IDE run consoles strip).
+ * finished transcript items scroll into terminal history via [StaticEffect];
+ * a full-width input box (with a real block cursor + line editing) and a
+ * status footer stay pinned in the live frame. Renders only in a real
+ * terminal — Mosaic repaints via ANSI, which IDE run consoles strip.
  */
 fun main(args: Array<String>) {
     val provider = resolveProvider(args)
@@ -66,6 +69,8 @@ fun main(args: Array<String>) {
     }
 }
 
+private val SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
 private sealed interface Item {
     val n: Int
     data class User(override val n: Int, val text: String) : Item
@@ -80,14 +85,19 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
     val transcript = remember { mutableStateListOf<Item>() }
     var seq by remember { mutableStateOf(0) }
     var input by remember { mutableStateOf("") }
+    var cursor by remember { mutableStateOf(0) }
     var working by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<ApprovalRequest?>(null) }
     var contextLength by remember { mutableStateOf(0L) }
     var usedTokens by remember { mutableStateOf(0L) }
     val history = remember { mutableStateListOf<String>() }
-    var historyIdx by remember { mutableStateOf(-1) }
+    var historyIdx by remember { mutableStateOf(0) }
+    var tick by remember { mutableStateOf(0) }
 
     fun add(item: Item) { transcript.add(item); seq++ }
+
+    // Animation clock: drives cursor blink and the working spinner.
+    LaunchedEffect(Unit) { while (true) { delay(110); tick++ } }
 
     LaunchedEffect(Unit) {
         core.events.collect { ev ->
@@ -124,15 +134,15 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
         scope.launch { core.submit(ApprovalResponse(UUID.randomUUID().toString(), sessionId, p.approvalId, decision)) }
     }
 
-    // Welcome banner + committed transcript scroll into terminal history (each renders once).
+    // Welcome banner + committed transcript scroll into terminal history (rendered once each).
     StaticEffect { WelcomeBanner(model, provider, cwd, sessionId) }
-    for (item in transcript) {
-        key(item.n) { StaticEffect { ItemView(item) } }
-    }
+    for (item in transcript) key(item.n) { StaticEffect { ItemView(item) } }
+
+    val width = LocalTerminalState.current.size.width.coerceIn(24, 200)
+    val blinkOn = (tick / 5) % 2 == 0
 
     Column(
         modifier = Modifier.onKeyEvent { e ->
-            // Ctrl-C: interrupt a running turn, else quit.
             if (e.ctrl && e.key == "c") {
                 if (working) scope.launch { core.submit(Interrupt(UUID.randomUUID().toString(), sessionId)) }
                 else kotlin.system.exitProcess(0)
@@ -149,7 +159,7 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
             when (e.key) {
                 "Enter" -> {
                     val text = input.trim()
-                    input = ""
+                    input = ""; cursor = 0
                     when {
                         text.isEmpty() -> {}
                         text == "/exit" || text == "/quit" || text == "exit" -> kotlin.system.exitProcess(0)
@@ -161,30 +171,36 @@ private fun KodaApp(core: KodaCore, sessionId: String, model: String, provider: 
                         }
                     }
                 }
-                "Backspace" -> input = input.dropLast(1)
+                "Backspace" -> if (cursor > 0) { input = input.removeRange(cursor - 1, cursor); cursor-- }
+                "Delete" -> if (cursor < input.length) input = input.removeRange(cursor, cursor + 1)
+                "ArrowLeft" -> cursor = (cursor - 1).coerceAtLeast(0)
+                "ArrowRight" -> cursor = (cursor + 1).coerceAtMost(input.length)
+                "Home" -> cursor = 0
+                "End" -> cursor = input.length
                 "ArrowUp" -> if (history.isNotEmpty()) {
-                    historyIdx = (historyIdx - 1).coerceAtLeast(0); input = history[historyIdx]
+                    historyIdx = (historyIdx - 1).coerceAtLeast(0)
+                    input = history[historyIdx]; cursor = input.length
                 }
                 "ArrowDown" -> {
-                    historyIdx += 1
-                    input = if (historyIdx >= history.size) { historyIdx = history.size; "" } else history[historyIdx]
+                    historyIdx = (historyIdx + 1).coerceAtMost(history.size)
+                    input = if (historyIdx >= history.size) "" else history[historyIdx]; cursor = input.length
                 }
-                " " -> input += " "
-                else -> if (e.key.length == 1) input += e.key
+                " " -> { input = input.substring(0, cursor) + " " + input.substring(cursor); cursor++ }
+                else -> if (e.key.length == 1) { input = input.substring(0, cursor) + e.key + input.substring(cursor); cursor++ }
             }
             true
-        }
+        },
     ) {
-        Text(statusLine(model, contextLength, usedTokens), color = KodaColors.dim)
+        Text("") // breathing room above the composer
+        Text(border(width, top = true), color = KodaColors.border)
         val prompt = pending
-        when {
-            prompt != null -> Text(
-                "approval  ${prompt.summary}   [y] allow  [a] always  [n] deny",
-                color = KodaColors.warn, textStyle = TextStyle.Bold,
-            )
-            working -> Text("❯ $input ⋯", color = KodaColors.accent)
-            else -> Text("❯ $input", color = KodaColors.accent, textStyle = TextStyle.Bold)
+        if (prompt != null) {
+            Text(boxLine(width, "⚠ ${prompt.summary}   [y] allow  [a] always  [n] deny"), color = KodaColors.warn)
+        } else {
+            Text(composerLine(width, input, cursor, blinkOn))
         }
+        Text(border(width, top = false), color = KodaColors.border)
+        Text(footer(model, contextLength, usedTokens, working, SPINNER[tick % SPINNER.length]), color = KodaColors.dim)
     }
 }
 
@@ -220,9 +236,44 @@ private fun WelcomeBanner(model: String, provider: String, cwd: String, sessionI
     }
 }
 
-private fun statusLine(model: String, contextLength: Long, used: Long): String {
+private fun border(width: Int, top: Boolean): String {
+    val (l, r) = if (top) "╭" to "╮" else "╰" to "╯"
+    return l + "─".repeat((width - 2).coerceAtLeast(0)) + r
+}
+
+/** The input line: prompt + text with a block cursor, padded to the box width. */
+private fun composerLine(width: Int, input: String, cursor: Int, blinkOn: Boolean) = buildAnnotatedString {
+    val inner = (width - 4).coerceAtLeast(8)
+    val full = "❯ $input"
+    val cursorAt = 2 + cursor
+    val start = (cursorAt - inner + 1).coerceAtLeast(0)
+    val visible = full.substring(start, minOf(full.length, start + inner))
+    val cursorIdx = cursorAt - start
+
+    append("│ ")
+    for (i in 0 until inner) {
+        val ch = if (i < visible.length) visible[i] else ' '
+        if (i == cursorIdx && blinkOn) {
+            pushStyle(SpanStyle(textStyle = TextStyle.Invert)); append(ch); pop()
+        } else if (i < 2) {
+            pushStyle(SpanStyle(color = KodaColors.accent, textStyle = TextStyle.Bold)); append(ch); pop()
+        } else {
+            append(ch)
+        }
+    }
+    append(" │")
+}
+
+private fun boxLine(width: Int, text: String): String {
+    val inner = (width - 4).coerceAtLeast(8)
+    val clipped = if (text.length > inner) text.take(inner - 1) + "…" else text.padEnd(inner)
+    return "│ $clipped │"
+}
+
+private fun footer(model: String, contextLength: Long, used: Long, working: Boolean, spin: Char): String {
     val pct = if (contextLength > 0 && used > 0) "${(used * 100 / contextLength).coerceAtMost(100)}%" else "—"
-    return "  ┄ $model · context $pct ┄"
+    val lead = if (working) "$spin working · " else ""
+    return "  $lead$model · context $pct · /exit to quit"
 }
 
 // --- provider resolution (shared client module comes in a later increment) ---
