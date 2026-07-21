@@ -21,6 +21,7 @@ import dev.koda.core.engine.KoogEngine
 import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
+import dev.koda.core.engine.BwrapShellExecutor
 import dev.koda.core.engine.EscalatingShellExecutor
 import dev.koda.core.engine.Sandbox
 import dev.koda.core.engine.SandboxPolicy
@@ -86,11 +87,13 @@ class KodaCore(
     private val hooks: HookRunner = HookLoader.load(config.kodaHome, config.cwd) { _events.emit(it) }
 
     private val sandboxActive: Boolean =
-        config.sandbox != SandboxPolicy.DANGER_FULL_ACCESS && Sandbox.isMacSeatbeltAvailable()
+        config.sandbox != SandboxPolicy.DANGER_FULL_ACCESS &&
+            (Sandbox.isMacSeatbeltAvailable() || Sandbox.isLinuxBwrapAvailable())
     private val sandboxNotice: String = when {
         config.sandbox == SandboxPolicy.DANGER_FULL_ACCESS -> "sandbox: off (danger-full-access)"
         Sandbox.isMacSeatbeltAvailable() -> "sandbox: seatbelt (${config.sandbox.name.lowercase()})"
-        else -> "sandbox: unavailable on this platform — shell runs unsandboxed"
+        Sandbox.isLinuxBwrapAvailable() -> "sandbox: bubblewrap (${config.sandbox.name.lowercase()})"
+        else -> "sandbox: unavailable (no seatbelt/bwrap) — shell runs unsandboxed"
     }
 
     private val engine = KoogEngine(
@@ -215,13 +218,16 @@ class KodaCore(
         }
     }
 
-    private fun shellFor(session: AgentSession): ShellExecutor =
-        if (!sandboxActive) DirectShellExecutor()
-        else EscalatingShellExecutor(
-            sandboxed = SeatbeltShellExecutor(config.sandbox),
+    private fun shellFor(session: AgentSession): ShellExecutor {
+        if (!sandboxActive) return DirectShellExecutor()
+        val sandboxed = if (Sandbox.isMacSeatbeltAvailable()) SeatbeltShellExecutor(config.sandbox)
+        else BwrapShellExecutor(config.sandbox)
+        return EscalatingShellExecutor(
+            sandboxed = sandboxed,
             direct = DirectShellExecutor(),
             approveEscalation = { cmd -> approveEscalation(session, cmd) },
         )
+    }
 
     /** Orchestrates one session: serializes its work items, owns interrupt. */
     private inner class SessionRuntime(val session: AgentSession) {

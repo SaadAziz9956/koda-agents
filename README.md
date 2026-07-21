@@ -63,10 +63,13 @@ Shell commands run inside an OS-level sandbox. On macOS this uses the built-in
 Apple Seatbelt (`sandbox-exec`) — nothing to install. Under the default
 `workspace-write` policy a command can read anywhere but can only **write** to
 the working directory and temp, **`.git` is protected**, and **network is
-denied**. Policies: `read-only`, `workspace-write` (default), `danger-full-access`
-(no sandbox). Linux (bubblewrap) is planned; where unavailable, the shell falls
-back to unsandboxed with a startup notice. This is OS-enforced containment, not
-just the approval prompt — a command physically cannot escape the workspace.
+denied**. On Linux the same policy is enforced with **bubblewrap** (`bwrap`) when it's
+installed. Policies: `read-only`, `workspace-write` (default),
+`danger-full-access` (no sandbox). If a sandboxed command fails *because* it
+was blocked, Koda asks to re-run it unsandboxed (escalation). Where no sandbox
+is available, the shell falls back to unsandboxed with a startup notice. This
+is OS-enforced containment, not just the approval prompt — a command physically
+cannot escape the workspace.
 
 ## Hooks
 

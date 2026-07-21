@@ -29,13 +29,51 @@ enum class SandboxPolicy {
 
 object Sandbox {
     private const val SEATBELT = "/usr/bin/sandbox-exec"
+    private val BWRAP_PATHS = listOf("/usr/bin/bwrap", "/bin/bwrap", "/usr/local/bin/bwrap")
+
+    private val osName get() = System.getProperty("os.name")
 
     fun isMacSeatbeltAvailable(): Boolean =
-        System.getProperty("os.name").startsWith("Mac") && java.io.File(SEATBELT).canExecute()
+        osName.startsWith("Mac") && java.io.File(SEATBELT).canExecute()
+
+    fun isLinuxBwrapAvailable(): Boolean =
+        osName.equals("Linux", ignoreCase = true) && bwrapPath() != null
+
+    private fun bwrapPath(): String? = BWRAP_PATHS.firstOrNull { java.io.File(it).canExecute() }
 
     /** Builds the Seatbelt argv wrapping `/bin/bash -c command` for [cwd] under [policy]. */
     fun seatbeltArgv(command: String, cwd: Path, policy: SandboxPolicy): List<String> =
         listOf(SEATBELT, "-p", profile(cwd, policy), "--", "/bin/bash", "-c", command)
+
+    /**
+     * Builds the bubblewrap argv for Linux: read-only root, cwd (and temp)
+     * bound writable under workspace-write, `.git` re-bound read-only, and the
+     * network namespace unshared (network denied). Mirrors the Seatbelt policy.
+     */
+    fun bwrapArgv(command: String, cwd: Path, policy: SandboxPolicy): List<String> {
+        val bwrap = bwrapPath() ?: error("bwrap not available")
+        val root = canonical(cwd)
+        val tmp = canonical(Path.of(System.getProperty("java.io.tmpdir")))
+        return buildList {
+            add(bwrap)
+            add("--ro-bind"); add("/"); add("/")
+            add("--dev"); add("/dev")
+            add("--proc"); add("/proc")
+            add("--unshare-user"); add("--unshare-pid")
+            add("--die-with-parent")
+            add("--chdir"); add(root)
+            if (policy == SandboxPolicy.WORKSPACE_WRITE) {
+                add("--bind"); add(root); add(root)
+                add("--bind"); add("/tmp"); add("/tmp")
+                if (tmp != "/tmp") { add("--bind"); add(tmp); add(tmp) }
+                val git = "$root/.git"
+                if (java.io.File(git).exists()) { add("--ro-bind"); add(git); add(git) }
+            }
+            // READ_ONLY: no writable binds. Both non-danger policies deny network:
+            add("--unshare-net")
+            add("--"); add("/bin/bash"); add("-c"); add(command)
+        }
+    }
 
     private fun profile(cwd: Path, policy: SandboxPolicy): String {
         val root = canonical(cwd)
@@ -84,17 +122,25 @@ class EscalatingShellExecutor(
     }
 }
 
-/** [ShellExecutor] that wraps commands in Seatbelt; flags likely sandbox denials. */
+/** [ShellExecutor] that wraps commands in Seatbelt (macOS); flags likely denials. */
 class SeatbeltShellExecutor(private val policy: SandboxPolicy) : ShellExecutor {
-    override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult {
-        val result = runProcess(Sandbox.seatbeltArgv(command, cwd, policy), cwd, timeoutMs)
-        return result.copy(sandboxDenied = looksDenied(result))
-    }
+    override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult =
+        runProcess(Sandbox.seatbeltArgv(command, cwd, policy), cwd, timeoutMs)
+            .let { it.copy(sandboxDenied = looksSandboxDenied(it)) }
+}
 
-    private fun looksDenied(r: ShellResult): Boolean {
-        if (r.exitCode == 0 || r.timedOut) return false
-        val s = r.output.lowercase()
-        return "operation not permitted" in s || "read-only file system" in s ||
-            "sandbox" in s || "deny(1)" in s
-    }
+/** [ShellExecutor] that wraps commands in bubblewrap (Linux); flags likely denials. */
+class BwrapShellExecutor(private val policy: SandboxPolicy) : ShellExecutor {
+    override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult =
+        runProcess(Sandbox.bwrapArgv(command, cwd, policy), cwd, timeoutMs)
+            .let { it.copy(sandboxDenied = looksSandboxDenied(it)) }
+}
+
+/** Heuristic: does a failed command look blocked by the sandbox (vs a normal error)? */
+private fun looksSandboxDenied(r: ShellResult): Boolean {
+    if (r.exitCode == 0 || r.timedOut) return false
+    val s = r.output.lowercase()
+    return "operation not permitted" in s || "read-only file system" in s ||
+        "permission denied" in s || "sandbox" in s || "deny(1)" in s ||
+        "network is unreachable" in s || "could not resolve host" in s
 }
