@@ -65,6 +65,25 @@ object Sandbox {
         runCatching { p.toRealPath().toString() }.getOrDefault(p.absolute().normalize().toString())
 }
 
+/**
+ * Runs commands sandboxed; if the sandbox blocks one, asks [approveEscalation]
+ * whether to re-run it unsandboxed (the Codex/Claude Code escalation pattern).
+ * Only sandbox *denials* escalate — a normal non-zero exit is returned as-is.
+ */
+class EscalatingShellExecutor(
+    private val sandboxed: ShellExecutor,
+    private val direct: ShellExecutor,
+    private val approveEscalation: suspend (command: String) -> Boolean,
+) : ShellExecutor {
+    override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult {
+        val result = sandboxed.run(command, cwd, timeoutMs)
+        if (result.sandboxDenied && approveEscalation(command)) {
+            return direct.run(command, cwd, timeoutMs)
+        }
+        return result
+    }
+}
+
 /** [ShellExecutor] that wraps commands in Seatbelt; flags likely sandbox denials. */
 class SeatbeltShellExecutor(private val policy: SandboxPolicy) : ShellExecutor {
     override suspend fun run(command: String, cwd: Path, timeoutMs: Long): ShellResult {

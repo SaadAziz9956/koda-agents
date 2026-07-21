@@ -21,6 +21,7 @@ import dev.koda.core.engine.KoogEngine
 import dev.koda.core.engine.McpConnection
 import dev.koda.core.engine.McpConnector
 import dev.koda.core.engine.ToolGate
+import dev.koda.core.engine.EscalatingShellExecutor
 import dev.koda.core.engine.Sandbox
 import dev.koda.core.engine.SandboxPolicy
 import dev.koda.core.engine.SeatbeltShellExecutor
@@ -84,12 +85,8 @@ class KodaCore(
 
     private val hooks: HookRunner = HookLoader.load(config.kodaHome, config.cwd) { _events.emit(it) }
 
-    /** Sandboxed shell on macOS Seatbelt when the policy asks for it; else direct. */
-    private val shell: ShellExecutor = when {
-        config.sandbox == SandboxPolicy.DANGER_FULL_ACCESS -> DirectShellExecutor()
-        Sandbox.isMacSeatbeltAvailable() -> SeatbeltShellExecutor(config.sandbox)
-        else -> DirectShellExecutor()
-    }
+    private val sandboxActive: Boolean =
+        config.sandbox != SandboxPolicy.DANGER_FULL_ACCESS && Sandbox.isMacSeatbeltAvailable()
     private val sandboxNotice: String = when {
         config.sandbox == SandboxPolicy.DANGER_FULL_ACCESS -> "sandbox: off (danger-full-access)"
         Sandbox.isMacSeatbeltAvailable() -> "sandbox: seatbelt (${config.sandbox.name.lowercase()})"
@@ -201,9 +198,35 @@ class KodaCore(
         data object Compact : SessionWork
     }
 
+    /** Escalation approval: emit a distinct request and await the user's answer. */
+    private suspend fun approveEscalation(session: AgentSession, command: String): Boolean {
+        // If bash wouldn't prompt at all (yolo / always-allowed), don't prompt to escalate either.
+        if (!session.permissions.needsApproval("bash", mutating = true)) return true
+        val approvalId = java.util.UUID.randomUUID().toString()
+        _events.emit(
+            dev.koda.protocol.ApprovalRequest(
+                session.id, approvalId, "bash",
+                "⚠ run WITHOUT sandbox (it was blocked): ${command.take(100)}", command,
+            )
+        )
+        return when (session.approvals.await(approvalId)) {
+            dev.koda.protocol.ApprovalDecision.DENY -> false
+            else -> true
+        }
+    }
+
+    private fun shellFor(session: AgentSession): ShellExecutor =
+        if (!sandboxActive) DirectShellExecutor()
+        else EscalatingShellExecutor(
+            sandboxed = SeatbeltShellExecutor(config.sandbox),
+            direct = DirectShellExecutor(),
+            approveEscalation = { cmd -> approveEscalation(session, cmd) },
+        )
+
     /** Orchestrates one session: serializes its work items, owns interrupt. */
     private inner class SessionRuntime(val session: AgentSession) {
         private val gate = ToolGate(session, { _events.emit(it) }, hooks)
+        private val shell = shellFor(session)
         private val delegate = ToolRegistry {
             tool(
                 DelegateTool(
