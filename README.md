@@ -57,6 +57,17 @@ Sessions persist as JSONL under `~/.koda/sessions/`.
 
 See [AGENTS.md](AGENTS.md) for the design constitution and roadmap.
 
+## Sandboxing
+
+Shell commands run inside an OS-level sandbox. On macOS this uses the built-in
+Apple Seatbelt (`sandbox-exec`) — nothing to install. Under the default
+`workspace-write` policy a command can read anywhere but can only **write** to
+the working directory and temp, **`.git` is protected**, and **network is
+denied**. Policies: `read-only`, `workspace-write` (default), `danger-full-access`
+(no sandbox). Linux (bubblewrap) is planned; where unavailable, the shell falls
+back to unsandboxed with a startup notice. This is OS-enforced containment, not
+just the approval prompt — a command physically cannot escape the workspace.
+
 ## Hooks
 
 Lifecycle subprocesses configured in `~/.koda/hooks.json` (global) or
