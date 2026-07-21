@@ -204,7 +204,8 @@ private fun KodaApp(
     StaticEffect { WelcomeBanner(model, provider, cwd, sessionId) }
     for (item in transcript) key(item.n) { StaticEffect { ItemView(item) } }
 
-    val width = LocalTerminalState.current.size.width.coerceIn(24, 200)
+    // Fall back to 80 when the terminal size isn't reported (Mosaic can return 0/tiny early).
+    val width = LocalTerminalState.current.size.width.let { if (it < 40) 80 else it }.coerceAtMost(200)
     val blinkOn = (tick / 5) % 2 == 0
 
     Column(
@@ -262,24 +263,27 @@ private fun KodaApp(
         },
     ) {
         Text("")
-        if (paletteOpen) {
-            filtered.forEachIndexed { i, c ->
-                val sel = i == palIdx
-                Text(
-                    (if (sel) "❯ " else "  ") + "/${c.name.padEnd(9)} ${c.desc}",
-                    color = if (sel) KodaColors.accent else KodaColors.dim,
-                    textStyle = if (sel) TextStyle.Bold else TextStyle.Unspecified,
-                )
-            }
-        }
-        Text(border(width, top = true), color = KodaColors.border)
         val prompt = pending
         if (prompt != null) {
-            Text(boxLine(width, "⚠ ${prompt.summary}   [y] allow  [a] always  [n] deny"), color = KodaColors.warn)
+            // Approval: options must always be visible — truncate the command, never the choices.
+            Text("  ⚠ approval needed", color = KodaColors.warn, textStyle = TextStyle.Bold)
+            Text("    ${prompt.summary.take((width - 6).coerceAtLeast(20))}", color = KodaColors.warn)
+            Text("    [y] allow    [a] always    [n] deny", color = KodaColors.warn, textStyle = TextStyle.Bold)
         } else {
+            if (paletteOpen) {
+                filtered.forEachIndexed { i, c ->
+                    val sel = i == palIdx
+                    Text(
+                        (if (sel) "❯ " else "  ") + "/${c.name.padEnd(9)} ${c.desc}",
+                        color = if (sel) KodaColors.accent else KodaColors.dim,
+                        textStyle = if (sel) TextStyle.Bold else TextStyle.Unspecified,
+                    )
+                }
+            }
+            Text(border(width, top = true), color = KodaColors.border)
             Text(composerLine(width, input, cursor, blinkOn))
+            Text(border(width, top = false), color = KodaColors.border)
         }
-        Text(border(width, top = false), color = KodaColors.border)
         Text(footer(model, contextLength, usedTokens, working, mode, SPINNER[tick % SPINNER.length]), color = KodaColors.dim)
     }
 }
