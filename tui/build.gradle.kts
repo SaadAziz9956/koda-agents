@@ -9,6 +9,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":client"))
     implementation(project(":core"))
     implementation(libs.coroutines.core)
     implementation(libs.mosaic.runtime)

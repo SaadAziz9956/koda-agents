@@ -20,11 +20,10 @@ import com.jakewharton.mosaic.ui.Color
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
-import dev.koda.core.ApiShape
-import dev.koda.core.KodaConfig
+import dev.koda.client.StartupException
+import dev.koda.client.resolveStartup
 import dev.koda.core.KodaCore
 import dev.koda.core.PermissionMode
-import dev.koda.core.ProviderConfig
 import dev.koda.protocol.ApprovalDecision
 import dev.koda.protocol.ApprovalRequest
 import dev.koda.protocol.ApprovalResponse
@@ -51,7 +50,6 @@ import dev.koda.protocol.TurnCompleted
 import dev.koda.protocol.TurnStarted
 import dev.koda.protocol.TurnStopReason
 import dev.koda.protocol.UserTurn
-import java.nio.file.Path
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -64,20 +62,18 @@ import kotlinx.coroutines.launch
  * in a real terminal (Mosaic repaints via ANSI, which IDE consoles strip).
  */
 fun main(args: Array<String>) {
-    val provider = resolveProvider(args)
-    val model = args.valueOf("--model") ?: defaultModel(provider)
-    val config = KodaConfig(
-        provider = provider,
-        model = model,
-        cwd = Path.of(System.getProperty("user.dir")),
-        permissionMode = if ("--yolo" in args) PermissionMode.YOLO else PermissionMode.DEFAULT,
-    )
-    val sessionId = args.valueOf("--session") ?: UUID.randomUUID().toString().take(8)
+    val startup = try {
+        resolveStartup(args)
+    } catch (e: StartupException) {
+        System.err.println("koda: ${e.message}")
+        kotlin.system.exitProcess(1)
+    }
+    val config = startup.config
 
     KodaCore.create(config).use { core ->
         core.start()
         runMosaicBlocking {
-            KodaApp(core, sessionId, model, provider.name, config.cwd.toString(), config.permissionMode)
+            KodaApp(core, startup.sessionId, config.model, config.provider.name, config.cwd.toString(), config.permissionMode)
         }
     }
 }
@@ -429,38 +425,9 @@ private fun ttyColumns(): Int? = runCatching {
     out.split(" ").getOrNull(1)?.toIntOrNull()
 }.getOrNull()
 
-private fun boxLine(width: Int, text: String): String {
-    val inner = (width - 4).coerceAtLeast(8)
-    val clipped = if (text.length > inner) text.take(inner - 1) + "…" else text.padEnd(inner)
-    return "│ $clipped │"
-}
-
 private fun footer(model: String, contextLength: Long, used: Long, working: Boolean, mode: PermissionMode, spin: Char): String {
     val pct = if (contextLength > 0 && used > 0) "${(used * 100 / contextLength).coerceAtMost(100)}%" else "—"
     val lead = if (working) "$spin working · " else ""
     val modeTag = if (mode == PermissionMode.YOLO) " · yolo" else ""
     return "  $lead$model · context $pct$modeTag · / for commands"
 }
-
-// --- provider resolution (shared client module comes in a later increment) ---
-
-private fun Array<String>.valueOf(flag: String): String? =
-    indexOf(flag).takeIf { it >= 0 && it + 1 < size }?.let { this[it + 1] }
-
-private fun resolveProvider(args: Array<String>): ProviderConfig {
-    val anthropic = System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }
-    val openai = System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }
-    val baseUrl = args.valueOf("--base-url") ?: System.getenv("KODA_BASE_URL")
-    return when {
-        args.valueOf("--provider") == "custom" || baseUrl != null -> ProviderConfig(
-            "custom", baseUrl ?: error("--base-url required for custom provider"),
-            System.getenv("KODA_API_KEY") ?: openai ?: "", ApiShape.OPENAI_CHAT_COMPLETIONS,
-        )
-        anthropic != null -> ProviderConfig("anthropic", "https://api.anthropic.com", anthropic, ApiShape.ANTHROPIC_MESSAGES)
-        openai != null -> ProviderConfig("openai", "https://api.openai.com/v1", openai, ApiShape.OPENAI_CHAT_COMPLETIONS)
-        else -> { System.err.println("koda: set ANTHROPIC_API_KEY or OPENAI_API_KEY"); kotlin.system.exitProcess(1) }
-    }
-}
-
-private fun defaultModel(p: ProviderConfig) =
-    if (p.apiShape == ApiShape.ANTHROPIC_MESSAGES) "claude-sonnet-4-6" else "gpt-5.1"

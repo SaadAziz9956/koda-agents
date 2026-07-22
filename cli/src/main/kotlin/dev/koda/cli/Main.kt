@@ -1,5 +1,7 @@
 package dev.koda.cli
 
+import dev.koda.client.StartupException
+import dev.koda.client.resolveStartup
 import dev.koda.core.*
 import dev.koda.protocol.*
 import kotlinx.coroutines.Dispatchers
@@ -20,15 +22,14 @@ internal const val RED = "\u001B[31m"
 internal const val RESET = "\u001B[0m"
 
 fun main(args: Array<String>) {
-    val cli = CliArgs.parse(args)
-    val provider = resolveProvider(cli)
-
-    val config = KodaConfig(
-        provider = provider,
-        model = cli.model ?: defaultModel(provider),
-        cwd = Path.of(System.getProperty("user.dir")),
-        permissionMode = cli.permissionMode,
-    )
+    val startup = try {
+        resolveStartup(args)
+    } catch (e: StartupException) {
+        System.err.println("${RED}koda: ${e.message}${RESET}")
+        kotlin.system.exitProcess(1)
+    }
+    val config = startup.config
+    val provider = config.provider
 
     KodaCore.create(config).use { core ->
         runBlocking {
@@ -37,8 +38,8 @@ fun main(args: Array<String>) {
             val collector = launch { core.events.collect { inbox.send(it) } }
 
             val state = CliState(
-                sessionId = cli.session ?: UUID.randomUUID().toString().take(8),
-                mode = cli.permissionMode,
+                sessionId = startup.sessionId,
+                mode = config.permissionMode,
             )
             val commandContext = CommandContext(core, inbox, state)
 
@@ -54,9 +55,10 @@ fun main(args: Array<String>) {
                 }
             }
 
-            if (cli.prompt != null) {
+            val headlessPrompt = startup.prompt
+            if (headlessPrompt != null) {
                 turnActive.set(true)
-                runTurn(core, inbox, state, cli.prompt, headless = true)
+                runTurn(core, inbox, state, headlessPrompt, headless = true)
                 turnActive.set(false)
             } else {
                 println("${BOLD}koda${RESET} ${DIM}v0.6.0 — ${config.model} @ ${provider.name} — session ${state.sessionId}${RESET}")
@@ -172,106 +174,3 @@ private suspend fun promptApproval(request: ApprovalRequest): ApprovalDecision =
             else -> ApprovalDecision.DENY
         }
     }
-
-private data class CliArgs(
-    val prompt: String?,
-    val model: String?,
-    val providerName: String?,
-    val baseUrl: String?,
-    val session: String?,
-    val permissionMode: PermissionMode,
-) {
-    companion object {
-        fun parse(args: Array<String>): CliArgs {
-            var prompt: String? = null
-            var model: String? = null
-            var provider: String? = null
-            var baseUrl: String? = null
-            var session: String? = null
-            var mode = PermissionMode.DEFAULT
-
-            var i = 0
-            while (i < args.size) {
-                when (val arg = args[i]) {
-                    "-p", "--prompt" -> prompt = args.getOrNull(++i)
-                    "--model" -> model = args.getOrNull(++i)
-                    "--provider" -> provider = args.getOrNull(++i)
-                    "--base-url" -> baseUrl = args.getOrNull(++i)
-                    "--session" -> session = args.getOrNull(++i)
-                    "--accept-edits" -> mode = PermissionMode.ACCEPT_EDITS
-                    "--yolo" -> mode = PermissionMode.YOLO
-                    "--help", "-h" -> {
-                        println(
-                            """
-                            koda — autonomous agent harness
-
-                            usage: koda [options]
-                              -p, --prompt <text>   run one turn headless and exit
-                              --model <id>          model id (default per provider)
-                              --provider <name>     anthropic | openai | custom (default: auto from env)
-                              --base-url <url>      OpenAI-compatible endpoint for --provider custom
-                              --session <id>        resume a session by id
-                              --accept-edits        auto-approve file edits (shell still asks)
-                              --yolo                no approval prompts at all
-                            """.trimIndent()
-                        )
-                        kotlin.system.exitProcess(0)
-                    }
-
-                    else -> if (!arg.startsWith("-") && prompt == null) prompt = arg
-                }
-                i++
-            }
-            return CliArgs(prompt, model, provider, baseUrl, session, mode)
-        }
-    }
-}
-
-private fun resolveProvider(cli: CliArgs): ProviderConfig {
-    val anthropicKey = System.getenv("ANTHROPIC_API_KEY")
-    val openaiKey = System.getenv("OPENAI_API_KEY")
-    val customKey = System.getenv("KODA_API_KEY")
-
-    return when (cli.providerName ?: autoDetect(anthropicKey, openaiKey)) {
-        "anthropic" -> ProviderConfig(
-            name = "anthropic",
-            baseUrl = "https://api.anthropic.com",
-            apiKey = anthropicKey ?: fail("ANTHROPIC_API_KEY is not set"),
-            apiShape = ApiShape.ANTHROPIC_MESSAGES,
-        )
-
-        "openai" -> ProviderConfig(
-            name = "openai",
-            baseUrl = "https://api.openai.com/v1",
-            apiKey = openaiKey ?: fail("OPENAI_API_KEY is not set"),
-            apiShape = ApiShape.OPENAI_CHAT_COMPLETIONS,
-        )
-
-        "custom" -> ProviderConfig(
-            name = "custom",
-            baseUrl = cli.baseUrl ?: System.getenv("KODA_BASE_URL")
-            ?: fail("--base-url or KODA_BASE_URL required for --provider custom"),
-            apiKey = customKey ?: openaiKey ?: "",
-            apiShape = ApiShape.OPENAI_CHAT_COMPLETIONS,
-        )
-
-        else -> fail("Unknown provider: ${cli.providerName}")
-    }
-}
-
-private fun autoDetect(anthropicKey: String?, openaiKey: String?): String = when {
-    anthropicKey != null -> "anthropic"
-    openaiKey != null -> "openai"
-    else -> fail("No API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or use --provider custom.")
-}
-
-private fun defaultModel(provider: ProviderConfig): String = when (provider.name) {
-    "anthropic" -> "claude-sonnet-4-6"
-    "openai" -> "gpt-5.1"
-    else -> fail("--model is required for --provider custom")
-}
-
-private fun fail(message: String): Nothing {
-    System.err.println("${RED}koda: $message${RESET}")
-    kotlin.system.exitProcess(1)
-}
