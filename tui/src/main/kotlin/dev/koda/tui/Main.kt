@@ -204,8 +204,10 @@ private fun KodaApp(
     StaticEffect { WelcomeBanner(model, provider, cwd, sessionId) }
     for (item in transcript) key(item.n) { StaticEffect { ItemView(item) } }
 
-    // Full terminal width; falls back to 80 only until the size is reported (updates on resize).
-    val width = LocalTerminalState.current.size.width.let { if (it <= 0) 80 else it }
+    // Real terminal width: read once from the TTY (Mosaic can under-report), and
+    // also honor Mosaic's live value so growing the window still widens the box.
+    val ttyCols = remember { ttyColumns() ?: 0 }
+    val width = maxOf(LocalTerminalState.current.size.width, ttyCols).let { if (it <= 0) 80 else it }
     val blinkOn = (tick / 5) % 2 == 0
 
     Column(
@@ -235,16 +237,21 @@ private fun KodaApp(
             }
             when (e.key) {
                 "Enter" -> {
-                    val text = input.trim(); input = ""; cursor = 0
-                    when {
-                        text.isEmpty() -> {}
-                        text == "/exit" || text == "/quit" || text == "exit" -> kotlin.system.exitProcess(0)
-                        text.startsWith("/") -> runCommand(text.drop(1).substringBefore(' ').lowercase())
-                        else -> {
-                            add(Item.User(seq, text))
-                            history.add(text); historyIdx = history.size
-                            working = true
-                            scope.launch { core.submit(UserTurn(id(), sessionId, text)) }
+                    // Shift/Alt+Enter inserts a newline; plain Enter submits.
+                    if (e.shift || e.alt) {
+                        input = input.substring(0, cursor) + "\n" + input.substring(cursor); cursor++
+                    } else {
+                        val text = input.trim(); input = ""; cursor = 0
+                        when {
+                            text.isEmpty() -> {}
+                            text == "/exit" || text == "/quit" || text == "exit" -> kotlin.system.exitProcess(0)
+                            text.startsWith("/") -> runCommand(text.drop(1).substringBefore(' ').lowercase())
+                            else -> {
+                                add(Item.User(seq, text))
+                                history.add(text); historyIdx = history.size
+                                working = true
+                                scope.launch { core.submit(UserTurn(id(), sessionId, text)) }
+                            }
                         }
                     }
                 }
@@ -334,17 +341,32 @@ private fun composerRows(width: Int, input: String, cursor: Int, blinkOn: Boolea
     val inner = (width - 4).coerceAtLeast(8)
     val full = "❯ $input"
     val cursorAt = 2 + cursor
-    val rowCount = (full.length / inner) + 1 // room for the cursor at/after the end
-    return (0 until rowCount).map { row ->
-        val start = row * inner
+
+    // Walk chars into rows, breaking on '\n' (hard newline) and at the inner width
+    // (soft wrap). Each cell keeps its global index so we can place the cursor and
+    // style the "❯ " prompt.
+    data class Cell(val ch: Char, val idx: Int)
+    val rows = ArrayList<MutableList<Cell>>()
+    var row = ArrayList<Cell>()
+    for (idx in full.indices) {
+        val c = full[idx]
+        if (c == '\n') { rows.add(row); row = ArrayList(); continue }
+        if (row.size >= inner) { rows.add(row); row = ArrayList() }
+        row.add(Cell(c, idx))
+    }
+    rows.add(row)
+
+    return rows.map { cells ->
         buildAnnotatedString {
             append("│ ")
-            for (i in 0 until inner) {
-                val idx = start + i
-                val ch = if (idx < full.length) full[idx] else ' '
+            for (col in 0 until inner) {
+                val cell = cells.getOrNull(col)
+                val ch = cell?.ch ?: ' '
+                val here = cell?.idx ?: (cells.lastOrNull()?.idx?.plus(1) ?: 0)
                 when {
-                    idx == cursorAt && blinkOn -> { pushStyle(SpanStyle(textStyle = TextStyle.Invert)); append(ch); pop() }
-                    idx < 2 -> { pushStyle(SpanStyle(color = KodaColors.accent, textStyle = TextStyle.Bold)); append(ch); pop() }
+                    blinkOn && here == cursorAt && cell != null -> { pushStyle(SpanStyle(textStyle = TextStyle.Invert)); append(ch); pop() }
+                    blinkOn && cursorAt == full.length && cells === rows.last() && col == cells.size -> { pushStyle(SpanStyle(textStyle = TextStyle.Invert)); append(' '); pop() }
+                    cell != null && cell.idx < 2 -> { pushStyle(SpanStyle(color = KodaColors.accent, textStyle = TextStyle.Bold)); append(ch); pop() }
                     else -> append(ch)
                 }
             }
@@ -352,6 +374,14 @@ private fun composerRows(width: Int, input: String, cursor: Int, blinkOn: Boolea
         }
     }
 }
+
+/** True terminal column count from the controlling TTY, or null if unavailable. */
+private fun ttyColumns(): Int? = runCatching {
+    val p = ProcessBuilder("sh", "-c", "stty size < /dev/tty 2>/dev/null").redirectErrorStream(true).start()
+    val out = p.inputStream.bufferedReader().readText().trim()
+    p.waitFor()
+    out.split(" ").getOrNull(1)?.toIntOrNull()
+}.getOrNull()
 
 private fun boxLine(width: Int, text: String): String {
     val inner = (width - 4).coerceAtLeast(8)
