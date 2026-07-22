@@ -95,6 +95,14 @@ data class LoadHistory(
     override val sessionId: String,
 ) : Submission
 
+/** Ask the core for the session's undo checkpoints. Answered with [CheckpointList]. */
+@Serializable
+@SerialName("list_checkpoints")
+data class ListCheckpoints(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 /**
  * Undo the last [steps] turns: restore the conversation to before them and
  * revert files those turns changed via the write/edit tools. Answered with
@@ -204,6 +212,17 @@ data class SessionHistory(
 
 @Serializable
 data class HistoryMessage(val role: String, val text: String)
+
+/** Answer to [ListCheckpoints]: undo points, newest first (index 1 = most recent turn). */
+@Serializable
+@SerialName("checkpoint_list")
+data class CheckpointList(
+    override val sessionId: String,
+    val checkpoints: List<CheckpointInfo>,
+) : Event
+
+@Serializable
+data class CheckpointInfo(val index: Int, val label: String, val fileCount: Int)
 
 /** Answer to [Rewind]. */
 @Serializable

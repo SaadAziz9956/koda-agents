@@ -11,6 +11,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,9 +35,12 @@ class DaemonClient(private val scope: CoroutineScope) {
     /** Set by the model to observe connection state. */
     var onStatus: (ConnStatus) -> Unit = {}
 
-    /** Connect to `base` (e.g. ws://127.0.0.1:4477) and auto-reconnect. */
+    private var job: Job? = null
+
+    /** Connect to `base` (e.g. ws://127.0.0.1:4477) and auto-reconnect. Re-targets cleanly. */
     fun connect(base: String) {
-        scope.launch {
+        job?.cancel()
+        job = scope.launch {
             while (true) {
                 onStatus(ConnStatus.Connecting)
                 try {

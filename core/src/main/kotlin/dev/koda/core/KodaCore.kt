@@ -160,6 +160,17 @@ class KodaCore(
                     }
                     _events.emit(dev.koda.protocol.SessionHistory(submission.sessionId, history))
                 }
+                is dev.koda.protocol.ListCheckpoints -> {
+                    val rows = checkpoints[submission.sessionId]?.list().orEmpty()
+                    _events.emit(
+                        dev.koda.protocol.CheckpointList(
+                            submission.sessionId,
+                            rows.mapIndexed { i, (label, files) ->
+                                dev.koda.protocol.CheckpointInfo(i + 1, label, files)
+                            },
+                        )
+                    )
+                }
                 is dev.koda.protocol.Rewind -> {
                     val outcome = checkpoints[submission.sessionId]?.rewind(submission.steps)
                     if (outcome == null) {

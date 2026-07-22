@@ -49,6 +49,10 @@ class SessionCheckpoints(private val max: Int = 50) {
     @Synchronized
     fun depth(): Int = stack.size
 
+    /** Checkpoints newest-first as (label, fileCount) — for the client's rewind view. */
+    @Synchronized
+    fun list(): List<Pair<String, Int>> = stack.reversed().map { it.label to it.files.size }
+
     /**
      * Undo the last [steps] turns. Restores each touched file to its state
      * before the earliest undone turn and returns the conversation snapshot to
