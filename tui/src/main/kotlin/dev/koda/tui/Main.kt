@@ -86,9 +86,11 @@ private data class TuiCmd(val name: String, val desc: String)
 
 private val COMMANDS = listOf(
     TuiCmd("help", "show available commands"),
+    TuiCmd("new", "start a fresh session"),
+    TuiCmd("resume", "switch to a saved session: /resume <id>"),
+    TuiCmd("sessions", "list saved sessions"),
     TuiCmd("clear", "clear the screen"),
     TuiCmd("compact", "compress conversation history"),
-    TuiCmd("sessions", "list saved sessions"),
     TuiCmd("skills", "list available skills"),
     TuiCmd("mcp", "list connected MCP servers"),
     TuiCmd("model", "show the current model"),
@@ -107,13 +109,14 @@ private sealed interface Item {
 @Composable
 private fun KodaApp(
     core: KodaCore,
-    sessionId: String,
+    initialSessionId: String,
     model: String,
     provider: String,
     cwd: String,
     initialMode: PermissionMode,
 ) {
     val scope = rememberCoroutineScope()
+    var sessionId by remember { mutableStateOf(initialSessionId) }
     val transcript = remember { mutableStateListOf<Item>() }
     var seq by remember { mutableStateOf(0) }
     var input by remember { mutableStateOf("") }
@@ -170,9 +173,22 @@ private fun KodaApp(
         scope.launch { core.submit(ApprovalResponse(id(), sessionId, p.approvalId, decision)) }
     }
 
-    fun runCommand(name: String) {
+    fun runCommand(name: String, arg: String? = null) {
         when (name) {
             "help" -> add(Item.Note(seq, "commands:\n" + COMMANDS.joinToString("\n") { "  /${it.name.padEnd(9)} ${it.desc}" }, KodaColors.dim))
+            "new" -> {
+                sessionId = id().take(8); transcript.clear(); seq++; usedTokens = 0
+                add(Item.Note(seq, "new session: $sessionId", KodaColors.dim))
+            }
+            "resume" -> {
+                val target = arg?.trim()
+                if (target.isNullOrEmpty()) {
+                    add(Item.Note(seq, "usage: /resume <id> — see /sessions", KodaColors.warn))
+                } else {
+                    sessionId = target; transcript.clear(); seq++; usedTokens = 0
+                    add(Item.Note(seq, "resumed '$target' — its history is active on your next message", KodaColors.dim))
+                }
+            }
             "clear" -> { transcript.clear(); seq++ }
             "compact" -> scope.launch { core.submit(CompactSession(id(), sessionId)) }
             "sessions" -> scope.launch { core.submit(ListSessions(id(), sessionId)) }
@@ -245,7 +261,10 @@ private fun KodaApp(
                         when {
                             text.isEmpty() -> {}
                             text == "/exit" || text == "/quit" || text == "exit" -> kotlin.system.exitProcess(0)
-                            text.startsWith("/") -> runCommand(text.drop(1).substringBefore(' ').lowercase())
+                            text.startsWith("/") -> {
+                            val parts = text.drop(1).split(" ", limit = 2)
+                            runCommand(parts[0].lowercase(), parts.getOrNull(1))
+                        }
                             else -> {
                                 add(Item.User(seq, text))
                                 history.add(text); historyIdx = history.size
