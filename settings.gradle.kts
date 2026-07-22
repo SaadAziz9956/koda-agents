@@ -14,4 +14,4 @@ dependencyResolutionManagement {
     }
 }
 
-include("protocol", "tools", "core", "client", "cli", "daemon", "tui", "gateway")
+include("protocol", "tools", "core", "client", "cli", "daemon", "tui", "gateway", "desktop")

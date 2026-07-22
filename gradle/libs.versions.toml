@@ -4,6 +4,7 @@ coroutines = "1.10.2"
 serialization = "1.9.0"
 ktor = "3.2.3"
 koog = "1.1.1"
+compose = "1.9.3"
 
 [libraries]
 koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
@@ -13,6 +14,9 @@ serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-jso
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version = "2.0.17" }
 mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version = "0.18.0" }
 
@@ -20,3 +24,4 @@ mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version = "
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
