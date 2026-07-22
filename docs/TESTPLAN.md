@@ -1,7 +1,6 @@
 # Koda — Extensive Test Plan (pre-v1.0)
 
-Everything on `dev` (v0.1–v0.11). Mark each ✅/❌. Tags:
-- **[mock]** runs offline against `scripts/mock_llm.py` — deterministic, no key. (Claude can run these.)
+Everything on `dev`. Mark each ✅/❌. Tags:
 - **[live]** needs a real API key — exercises real model behavior.
 - **[term]** must run in a REAL terminal (the Mosaic TUI won't render in an IDE run window).
 - **[linux]** needs a Linux host (bubblewrap) — unverifiable on macOS.
@@ -64,20 +63,20 @@ Run `$CLI` (or `$TUI`) with cwd = `~/koda-testbed`:
 - [ ] `what are your rules and what do you call me?` → reply starts **[koda]**, ≤3 sentences, calls you **Saad** (hierarchy + @import + .local all at once).
 - [ ] `read sub/legacy.kt` then `anything special about it?` → knows sub/ is legacy (subtree lazy-load).
 
-## 5. Skills (v0.5)  [mock + live]
-- [ ] [mock] `/skills` lists ~177.
-- [ ] [live] `/codebase-inspection` → loads skill, installs pygount (approve), runs real LOC analysis.
-- [ ] [live] a skill you pick by name loads and is followed.
+## 5. Skills (v0.5)  [live]
+- [ ] `/skills` lists ~177.
+- [ ] `/codebase-inspection` → loads skill, installs pygount (approve), runs real LOC analysis.
+- [ ] a skill you pick by name loads and is followed.
 
-## 6. MCP (v0.4)  [mock]
+## 6. MCP (v0.4)  [live]
 ```sh
 mkdir -p ~/koda-testbed/.koda
-cat > ~/koda-testbed/.koda/mcp.json <<EOF
-{"mcpServers":{"mock":{"command":"python3","args":["$PWD/scripts/mock_mcp.py"]}}}
+cat > ~/koda-testbed/.koda/mcp.json <<'EOF'
+{"mcpServers":{"fs":{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem","/tmp"]}}}
 EOF
 ```
-- [ ] startup notice "mcp: connected 'mock'"; `/mcp` lists it + `echo` tool.
-- [ ] `use echo to say hi` → echo tool runs through the approval gate.
+- [ ] startup notice "mcp: connected 'fs'"; `/mcp` lists it + its tools.
+- [ ] `use the fs server to list /tmp` → an MCP tool runs through the approval gate.
 
 ## 7. Subagents (v0.6)  [live]
 - [ ] `use a subagent to find all tool classes` → `⤷ delegating` … `⤶ subagent done`; read-only.
@@ -88,8 +87,8 @@ EOF
 - [ ] `run: rm -rf /tmp/koda_fake` → **blocked** ("blocked by policy").
 - [ ] after turns: `cat /tmp/koda_stop.log` → one `tick` per turn.
 
-## 9. Sandboxing (v0.11)  [mock for blocks, live for feel]
-macOS [mock] (Claude verified these):
+## 9. Sandboxing (v0.11)  [live]
+macOS:
 - [ ] workspace write succeeds; write to `~` **blocked** (no leak); write to `.git` **blocked**; network **blocked**.
 - [ ] escalation: default mode, blocked command → "⚠ run WITHOUT sandbox" prompt → **n** stays blocked / **y** re-runs.
 - [ ] `--yolo` auto-escalates (blocked cmd re-runs unsandboxed).
@@ -120,7 +119,6 @@ In a real terminal (`$TUI`):
 ---
 
 ## Division of labor
-- **Claude auto-runs (mock/deterministic):** §5.1, §6, §9 (macOS blocks + escalation), regression of §1 tools.
-- **You run [live]:** §1–§4, §5.2–3, §7, §8, §12.
-- **You run [term]:** §10, §11.
+- **You run [live]** (needs a key): §1–§9, §12.
+- **You run [term]** (real terminal): §10, §11.
 - **Linux box / CI:** §9 [linux].

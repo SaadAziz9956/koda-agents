@@ -107,5 +107,4 @@ Build and run:
 ```sh
 ./gradlew build                          # compile all modules
 ./gradlew :cli:installDist               # produce cli/build/install/cli/bin/cli
-python3 scripts/mock_llm.py              # offline test provider (no API key)
 ```
