@@ -12,11 +12,13 @@ import dev.koda.protocol.CheckpointInfo
 import dev.koda.protocol.CheckpointList
 import dev.koda.protocol.CompactSession
 import dev.koda.protocol.ErrorEvent
+import dev.koda.protocol.Interrupt
 import dev.koda.protocol.ListCheckpoints
 import dev.koda.protocol.ListSessions
 import dev.koda.protocol.LoadHistory
 import dev.koda.protocol.Notice
 import dev.koda.protocol.PermissionModeSetting
+import dev.koda.protocol.ReasoningDelta
 import dev.koda.protocol.Rewind
 import dev.koda.protocol.SessionCompacted
 import dev.koda.protocol.SessionHistory
@@ -66,6 +68,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
 
     var working by mutableStateOf(false); private set
     var streaming by mutableStateOf(""); private set
+    var reasoning by mutableStateOf(""); private set
 
     val lines = mutableStateListOf<Line>()
     val sessions = mutableStateListOf<SessionSummary>()
@@ -94,9 +97,24 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             }
         }
     }
+    private val reasonBuf = StringBuilder()
+    private var reasonFlushScheduled = false
+    private fun onReason(text: String) {
+        synchronized(reasonBuf) { reasonBuf.append(text) }
+        if (!reasonFlushScheduled) {
+            reasonFlushScheduled = true
+            scope.launch {
+                delay(40)
+                reasonFlushScheduled = false
+                reasoning = synchronized(reasonBuf) { reasonBuf.toString() }
+            }
+        }
+    }
     private fun clearStream() {
         synchronized(deltaBuf) { deltaBuf.setLength(0) }
+        synchronized(reasonBuf) { reasonBuf.setLength(0) }
         streaming = ""
+        reasoning = ""
     }
 
     init {
@@ -114,6 +132,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         modelName = ev.model; providerName = ev.provider; contextLength = ev.contextLength
                     }
                     is TurnStarted -> if (ev.sessionId == sessionId) clearStream()
+                    is ReasoningDelta -> if (ev.sessionId == sessionId) onReason(ev.text)
                     is TextDelta -> if (ev.sessionId == sessionId) onDelta(ev.text)
                     is AssistantMessage -> {
                         if (ev.text.isNotBlank()) add { Line.Assistant(it, ev.text) }
@@ -172,6 +191,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     }
 
     fun rewind(steps: Int) { scope.launch { client.submit(Rewind(id(), sessionId, steps)) } }
+
+    fun interrupt() { scope.launch { client.submit(Interrupt(id(), sessionId)) } }
 
     fun newSession() {
         sessionId = id().take(8); lines.clear(); checkpoints.clear(); usedTokens = 0

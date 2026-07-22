@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -87,6 +88,10 @@ private fun TopBar(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: (
             if (sub.isNotBlank()) Text(sub, fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.weight(1f))
+        if (model.working) {
+            Text("working…", fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+        }
         Chip("⌘K", onClick = onOpenPalette)
         Spacer(Modifier.width(10.dp))
         ContextRing(model.contextPercent)
@@ -110,7 +115,10 @@ private fun Chip(text: String, onClick: () -> Unit) {
 @Composable
 private fun Transcript(model: AppModel) {
     val state = rememberLazyListState()
-    val total = model.lines.size + (if (model.streaming.isNotBlank()) 1 else 0) + (if (model.pendingApproval != null) 1 else 0)
+    val total = model.lines.size +
+        (if (model.reasoning.isNotBlank()) 1 else 0) +
+        (if (model.streaming.isNotBlank()) 1 else 0) +
+        (if (model.pendingApproval != null) 1 else 0)
     // Follow new content only when the user is already at the bottom, so
     // scrolling back to read isn't yanked away mid-stream.
     val atBottom by remember {
@@ -120,7 +128,7 @@ private fun Transcript(model: AppModel) {
             count == 0 || last >= count - 1
         }
     }
-    LaunchedEffect(total, model.streaming) {
+    LaunchedEffect(total, model.streaming, model.reasoning) {
         if (total > 0 && atBottom) state.scrollToItem(total - 1)
     }
     LazyColumn(
@@ -130,6 +138,7 @@ private fun Transcript(model: AppModel) {
         contentPadding = PaddingValues(vertical = 22.dp),
     ) {
         items(model.lines, key = { it.key }) { line -> LineView(line) }
+        if (model.reasoning.isNotBlank()) item(key = -3) { ReasoningBlock(model.reasoning) }
         if (model.streaming.isNotBlank()) item(key = -1) { StreamingLine(model.streaming) }
         model.pendingApproval?.let { req -> item(key = -2) { ApprovalCard(req.summary) { model.approve(it) } } }
     }
@@ -143,13 +152,22 @@ private fun LineView(line: Line) {
             Spacer(Modifier.size(5.dp))
             Text(line.text, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium, fontSize = 14.sp)
         }
-        is Line.Assistant -> Text(line.text, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp)
+        is Line.Assistant -> MarkdownText(line.text)
         is Line.Tool -> ToolCard(line)
         is Line.Note -> Text(
             line.text,
             color = if (line.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             fontFamily = Ember.mono, fontSize = 12.sp,
         )
+    }
+}
+
+@Composable
+private fun ReasoningBlock(text: String) {
+    Column {
+        Text("THINKING", fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.size(4.dp))
+        Text(text, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 19.sp)
     }
 }
 
@@ -226,6 +244,10 @@ private fun Composer(model: AppModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ModeChip(model)
                 Spacer(Modifier.weight(1f))
+                if (model.working) {
+                    EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
+                    Spacer(Modifier.width(8.dp))
+                }
                 EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank())
             }
         }
