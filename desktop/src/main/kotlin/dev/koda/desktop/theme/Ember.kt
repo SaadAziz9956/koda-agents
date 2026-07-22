@@ -5,12 +5,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Ember — Koda's identity, applied as a skin over the Material 3 Expressive
@@ -20,12 +24,12 @@ import androidx.compose.ui.unit.dp
  */
 object Ember {
     // dark
-    val dGround = Color(0xFF141313); val dSurface = Color(0xFF1C1B1A); val dSurface2 = Color(0xFF252322)
+    val dGround = Color(0xFF141313); val dRail = Color(0xFF181716); val dSurface = Color(0xFF1C1B1A); val dSurface2 = Color(0xFF252322)
     val dBorder = Color(0xFF322F2D); val dBorderStrong = Color(0xFF443F3C)
     val dText = Color(0xFFEAE6E2); val dTextDim = Color(0xFFA0968E)
     val dAccent = Color(0xFFF0663C); val dOnAccent = Color(0xFF1B0B06)
     // light
-    val lGround = Color(0xFFF2F0EE); val lSurface = Color(0xFFFBFAF9); val lSurface2 = Color(0xFFE9E5E2)
+    val lGround = Color(0xFFF2F0EE); val lRail = Color(0xFFEDEAE6); val lSurface = Color(0xFFFBFAF9); val lSurface2 = Color(0xFFE9E5E2)
     val lBorder = Color(0xFFDAD4D0); val lBorderStrong = Color(0xFFC7BFB9)
     val lText = Color(0xFF241F1C); val lTextDim = Color(0xFF665D57)
     val lAccent = Color(0xFFD24A22); val lOnAccent = Color(0xFFFFFFFF)
@@ -41,6 +45,7 @@ private val emberDark: ColorScheme = darkColorScheme(
     background = Ember.dGround, onBackground = Ember.dText,
     surface = Ember.dSurface, onSurface = Ember.dText,
     surfaceVariant = Ember.dSurface2, onSurfaceVariant = Ember.dTextDim,
+    surfaceContainerLow = Ember.dRail,
     outline = Ember.dBorderStrong, outlineVariant = Ember.dBorder,
     error = Ember.danger,
 )
@@ -51,9 +56,26 @@ private val emberLight: ColorScheme = lightColorScheme(
     background = Ember.lGround, onBackground = Ember.lText,
     surface = Ember.lSurface, onSurface = Ember.lText,
     surfaceVariant = Ember.lSurface2, onSurfaceVariant = Ember.lTextDim,
+    surfaceContainerLow = Ember.lRail,
     outline = Ember.lBorderStrong, outlineVariant = Ember.lBorder,
     error = Ember.danger,
 )
+
+/**
+ * A restrained type scale for a dense pro tool: a humanist sans throughout,
+ * lighter than Material's defaults, with sizes that match the Ember mockup.
+ */
+private val sans = FontFamily.SansSerif
+private val kodaTypography = Typography().run {
+    copy(
+        titleLarge = titleLarge.copy(fontFamily = sans, fontSize = 18.sp, fontWeight = FontWeight.Bold),
+        titleMedium = titleMedium.copy(fontFamily = sans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+        bodyLarge = bodyLarge.copy(fontFamily = sans, fontSize = 14.sp, lineHeight = 21.sp),
+        bodyMedium = bodyMedium.copy(fontFamily = sans, fontSize = 13.sp),
+        labelLarge = labelLarge.copy(fontFamily = sans, fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+        labelSmall = labelSmall.copy(fontFamily = sans, fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold),
+    )
+}
 
 /** Tightened shape scale — a pro instrument, not M3's default pills. */
 private val kodaShapes = Shapes(
@@ -78,6 +100,7 @@ fun KodaTheme(
     MaterialTheme(
         colorScheme = if (dark) emberDark else emberLight,
         shapes = kodaShapes,
+        typography = kodaTypography,
         content = content,
     )
 }

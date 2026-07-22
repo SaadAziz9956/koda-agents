@@ -32,6 +32,7 @@ import dev.koda.protocol.TurnCompleted
 import dev.koda.protocol.TurnStarted
 import dev.koda.protocol.UserTurn
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -78,6 +79,26 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     private fun add(make: (Int) -> Line) { lines.add(make(seq++)) }
     private fun id() = UUID.randomUUID().toString()
 
+    // Token-delta coalescing: append to a buffer and publish at most ~1/frame,
+    // so a fast stream doesn't recompose the transcript on every character.
+    private val deltaBuf = StringBuilder()
+    private var flushScheduled = false
+    private fun onDelta(text: String) {
+        synchronized(deltaBuf) { deltaBuf.append(text) }
+        if (!flushScheduled) {
+            flushScheduled = true
+            scope.launch {
+                delay(40)
+                flushScheduled = false
+                streaming = synchronized(deltaBuf) { deltaBuf.toString() }
+            }
+        }
+    }
+    private fun clearStream() {
+        synchronized(deltaBuf) { deltaBuf.setLength(0) }
+        streaming = ""
+    }
+
     init {
         client.onStatus = { s ->
             status = s
@@ -92,14 +113,14 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     is SessionStarted -> if (ev.sessionId == sessionId) {
                         modelName = ev.model; providerName = ev.provider; contextLength = ev.contextLength
                     }
-                    is TurnStarted -> if (ev.sessionId == sessionId) streaming = ""
-                    is TextDelta -> if (ev.sessionId == sessionId) streaming += ev.text
+                    is TurnStarted -> if (ev.sessionId == sessionId) clearStream()
+                    is TextDelta -> if (ev.sessionId == sessionId) onDelta(ev.text)
                     is AssistantMessage -> {
                         if (ev.text.isNotBlank()) add { Line.Assistant(it, ev.text) }
-                        streaming = ""
+                        clearStream()
                     }
                     is ToolBegin -> {
-                        streaming = ""
+                        clearStream()
                         add { Line.Tool(it, ev.toolName, ev.argsJson.take(140), ToolStatus.Running) }
                     }
                     is ToolEnd -> {
@@ -127,7 +148,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         add { Line.Note(it, "— resumed $sessionId (${ev.messages.size} messages) —") }
                     }
                     is TurnCompleted -> if (ev.sessionId == sessionId) {
-                        working = false; streaming = ""; refreshCheckpoints()
+                        working = false; clearStream(); refreshCheckpoints()
                     }
                     else -> {}
                 }

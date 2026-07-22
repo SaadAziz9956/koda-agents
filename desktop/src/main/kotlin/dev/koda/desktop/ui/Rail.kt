@@ -30,7 +30,7 @@ import dev.koda.desktop.theme.Ember
 
 @Composable
 fun Rail(model: AppModel, modifier: Modifier = Modifier) {
-    Column(modifier.background(MaterialTheme.colorScheme.surface)) {
+    Column(modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 16.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

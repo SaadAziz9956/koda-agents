@@ -17,10 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,8 +109,23 @@ private fun Chip(text: String, onClick: () -> Unit) {
 
 @Composable
 private fun Transcript(model: AppModel) {
+    val state = rememberLazyListState()
+    val total = model.lines.size + (if (model.streaming.isNotBlank()) 1 else 0) + (if (model.pendingApproval != null) 1 else 0)
+    // Follow new content only when the user is already at the bottom, so
+    // scrolling back to read isn't yanked away mid-stream.
+    val atBottom by remember {
+        derivedStateOf {
+            val last = state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val count = state.layoutInfo.totalItemsCount
+            count == 0 || last >= count - 1
+        }
+    }
+    LaunchedEffect(total, model.streaming) {
+        if (total > 0 && atBottom) state.scrollToItem(total - 1)
+    }
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 30.dp),
+        state = state,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 30.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp),
         contentPadding = PaddingValues(vertical = 22.dp),
     ) {
