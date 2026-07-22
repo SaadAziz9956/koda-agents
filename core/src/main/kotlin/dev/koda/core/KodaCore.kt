@@ -148,6 +148,17 @@ class KodaCore(
                         skills.values.sortedBy { it.name }.map { SkillSummary(it.name, it.description) },
                     )
                 )
+                is dev.koda.protocol.LoadHistory -> {
+                    val history = repository.load(submission.sessionId)?.messages.orEmpty().mapNotNull { m ->
+                        val role = when (m.role) {
+                            ai.koog.prompt.message.Message.Role.User -> "user"
+                            ai.koog.prompt.message.Message.Role.Assistant -> "assistant"
+                            else -> return@mapNotNull null
+                        }
+                        m.textContent().takeIf { it.isNotBlank() }?.let { dev.koda.protocol.HistoryMessage(role, it) }
+                    }
+                    _events.emit(dev.koda.protocol.SessionHistory(submission.sessionId, history))
+                }
                 is SetPermissionMode ->
                     runtimeFor(submission.sessionId).session.permissions.updateMode(
                         when (submission.mode) {

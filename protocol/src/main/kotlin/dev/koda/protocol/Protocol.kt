@@ -87,6 +87,14 @@ data class ListSkills(
     override val sessionId: String,
 ) : Submission
 
+/** Ask the core to replay a session's prior messages. Answered with [SessionHistory]. */
+@Serializable
+@SerialName("load_history")
+data class LoadHistory(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 /** Change the permission mode of a running session. */
 @Serializable
 @SerialName("set_permission_mode")
@@ -172,6 +180,17 @@ data class SkillSummary(
     val name: String,
     val description: String,
 )
+
+/** Answer to [LoadHistory]: a session's prior user/assistant messages, in order. */
+@Serializable
+@SerialName("session_history")
+data class SessionHistory(
+    override val sessionId: String,
+    val messages: List<HistoryMessage>,
+) : Event
+
+@Serializable
+data class HistoryMessage(val role: String, val text: String)
 
 /** Informational message from the core (startup notices, MCP connect results). */
 @Serializable

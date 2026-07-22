@@ -153,6 +153,13 @@ private fun KodaApp(
                 is ErrorEvent -> add(Item.Note(seq, "error: ${ev.message}", KodaColors.err))
                 is SessionList -> add(Item.Note(seq, "sessions:\n" + (ev.sessions.joinToString("\n") { "  ${it.id}  ·  ${it.messageCount} msgs" }.ifEmpty { "  (none)" }), KodaColors.dim))
                 is SkillList -> add(Item.Note(seq, "skills (${ev.skills.size}): " + ev.skills.take(40).joinToString(", ") { it.name }, KodaColors.dim))
+                is dev.koda.protocol.SessionHistory -> if (ev.sessionId == sessionId) {
+                    transcript.clear(); seq++
+                    ev.messages.forEach { m ->
+                        if (m.role == "user") add(Item.User(seq, m.text)) else add(Item.Assistant(seq, m.text))
+                    }
+                    add(Item.Note(seq, "— resumed $sessionId (${ev.messages.size} messages) —", KodaColors.dim))
+                }
                 is McpServerList -> add(Item.Note(seq, if (ev.servers.isEmpty()) "no MCP servers connected" else "mcp: " + ev.servers.joinToString(", ") { "${it.name}(${it.toolNames.size})" }, KodaColors.dim))
                 is TurnCompleted -> {
                     working = false
@@ -185,8 +192,8 @@ private fun KodaApp(
                 if (target.isNullOrEmpty()) {
                     add(Item.Note(seq, "usage: /resume <id> — see /sessions", KodaColors.warn))
                 } else {
-                    sessionId = target; transcript.clear(); seq++; usedTokens = 0
-                    add(Item.Note(seq, "resumed '$target' — its history is active on your next message", KodaColors.dim))
+                    sessionId = target; usedTokens = 0
+                    scope.launch { core.submit(dev.koda.protocol.LoadHistory(id(), target)) }
                 }
             }
             "clear" -> { transcript.clear(); seq++ }
