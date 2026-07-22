@@ -5,3 +5,5 @@ out/
 *.iml
 .DS_Store
 local.properties
+hs_err_pid*.log
+replay_pid*.log

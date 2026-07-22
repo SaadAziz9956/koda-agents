@@ -108,3 +108,7 @@ Build and run:
 ./gradlew build                          # compile all modules
 ./gradlew :cli:installDist               # produce cli/build/install/cli/bin/cli
 ```
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE).
