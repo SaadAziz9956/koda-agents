@@ -113,7 +113,16 @@ In a real terminal (`$TUI`):
 - [ ] Anthropic (default) works.
 - [ ] `--provider custom --base-url <openai-compatible>` (e.g. a local/OpenRouter endpoint) works.
 
-## 13. Daemon (optional)  [live]
+## 13. WhatsApp gateway (v0.14)  [live]
+Local (no Meta needed), `KODA_WHATSAPP_ALLOWED=<id>`, `WHATSAPP_VERIFY_TOKEN=t`:
+- [ ] GET `/webhook?hub.mode=subscribe&hub.verify_token=t&hub.challenge=X` → echoes `X`; wrong token → 403.
+- [ ] with `WHATSAPP_APP_SECRET` set: POST with no/bad `X-Hub-Signature-256` → 403; valid HMAC → 200.
+- [ ] POST inbound from a non-allowlisted `from` → dropped (logged), no turn.
+- [ ] POST inbound from an allowlisted `from` → a turn runs; reply logged (dry-run) or sent (creds set).
+End-to-end [live, Meta]:
+- [ ] via a tunnel + real creds: message the number → agent replies; a gated tool → chat asks yes/no.
+
+## 14. Daemon (optional)  [live]
 - [ ] `./gradlew :daemon:run` → connect with `websocat ws://127.0.0.1:4477/ws`, send a `user_turn` frame, observe event stream.
 
 ---

@@ -109,6 +109,11 @@ Build and run:
 ./gradlew :cli:installDist               # produce cli/build/install/cli/bin/cli
 ```
 
+## WhatsApp gateway
+
+Talk to Koda from your phone via the WhatsApp Business Cloud API. Setup,
+environment, and security model are documented in [docs/GATEWAY.md](docs/GATEWAY.md).
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
