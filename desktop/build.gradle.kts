@@ -32,6 +32,15 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "Koda"
             packageVersion = "1.0.0"
+            description = "Koda — a personal agent, on your desktop."
+            vendor = "Koda"
+            macOS {
+                bundleID = "dev.koda.desktop"
+                iconFile.set(project.file("icons/Koda.icns"))
+            }
+            linux {
+                iconFile.set(project.file("icons/icon.png"))
+            }
         }
     }
 }

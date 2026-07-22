@@ -50,9 +50,29 @@ desktop/
 - One daemon = one Koda; sessions listed via the existing `ListSessions`
   submission. The desktop is just another surface on the same agent.
 
+## Packaging
+
+The module bundles a native installer via Compose Desktop's `jpackage`
+integration (config in `desktop/build.gradle.kts` → `nativeDistributions`),
+with an Ember app icon in `desktop/icons/` (`Koda.icns` for macOS,
+`icon.png` for Linux; regenerable from `icon_source_1024.png`).
+
+```sh
+./gradlew :desktop:packageDistributionForCurrentOS
+# macOS → desktop/build/compose/binaries/main/dmg/Koda-<version>.dmg  (+ .app)
+# Linux → a .deb under the same tree
+```
+
+The app is **not code-signed/notarized**, so on first launch macOS Gatekeeper
+will warn. Right-click the app → Open (or `xattr -dr com.apple.quarantine
+/Applications/Koda.app`). It remains a *client* — a Koda daemon must be
+running for it to connect.
+
 ## Verification
 
 - `./gradlew :desktop:build` compiles/assembles on CI.
+- `./gradlew :desktop:packageDistributionForCurrentOS` produces the .dmg/.app
+  with the embedded icon and `dev.koda.desktop` bundle id.
 - Live: `./gradlew :daemon:run` in one shell, `./gradlew :desktop:run` in
   another — the window connects and a turn streams. (GUI can't be verified
   headlessly; run locally.)
