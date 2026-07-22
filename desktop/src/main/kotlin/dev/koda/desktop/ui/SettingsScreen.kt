@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -46,7 +45,7 @@ fun SettingsScreen(model: AppModel, onClose: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Settings", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onClose) { Text("Done") }
+                EmberTextButton("Done", onClick = onClose)
             }
             Spacer(Modifier.size(14.dp))
 

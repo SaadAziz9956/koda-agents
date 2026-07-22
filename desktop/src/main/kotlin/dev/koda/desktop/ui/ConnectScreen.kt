@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,10 +42,10 @@ fun ConnectScreen(model: AppModel) {
             Text("Point the app at a running daemon — on this machine or your server.",
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.size(20.dp))
-            OutlinedTextField(
+            EmberField(
                 value = url, onValueChange = { url = it },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Daemon address") },
+                placeholder = "ws://127.0.0.1:4477",
+                modifier = Modifier.fillMaxWidth(), mono = true, onSubmit = { model.connect(url) },
             )
             Spacer(Modifier.size(8.dp))
             val status = when (model.status) {
@@ -57,7 +55,7 @@ fun ConnectScreen(model: AppModel) {
             }
             Text(status.first, fontSize = 12.sp, fontFamily = Ember.mono, color = status.second)
             Spacer(Modifier.size(14.dp))
-            Button(onClick = { model.connect(url) }, modifier = Modifier.fillMaxWidth()) { Text("Connect") }
+            EmberButton("Connect", onClick = { model.connect(url) }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.size(18.dp))
             Text("No daemon yet? Run  ./gradlew :daemon:run  on the target machine.",
                 fontSize = 11.5f.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)

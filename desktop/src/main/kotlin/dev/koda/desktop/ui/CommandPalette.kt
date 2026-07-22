@@ -18,11 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,16 +61,12 @@ fun CommandPalette(model: AppModel, onClose: () -> Unit, onOpenSettings: () -> U
                 .background(MaterialTheme.colorScheme.surface).border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(15.dp))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
         ) {
-            TextField(
+            EmberField(
                 value = query, onValueChange = { query = it },
+                placeholder = "Search commands, sessions, skills…",
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
-                placeholder = { Text("Search commands, sessions, skills…") },
-                singleLine = true,
-                keyboardActions = KeyboardActions(onAny = { filtered.firstOrNull()?.let(::runAndClose) }),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                ),
+                bordered = false,
+                onSubmit = { filtered.firstOrNull()?.let(::runAndClose) },
             )
             HDivider()
             LazyColumn(Modifier.heightIn(max = 360.dp), contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {

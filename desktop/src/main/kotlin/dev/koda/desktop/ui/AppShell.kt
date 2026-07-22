@@ -18,13 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -187,9 +182,9 @@ private fun ApprovalCard(summary: String, onDecide: (ApprovalDecision) -> Unit) 
         Text(summary, fontFamily = Ember.mono, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.size(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { onDecide(ApprovalDecision.APPROVE) }) { Text("Allow  Y") }
-            OutlinedButton(onClick = { onDecide(ApprovalDecision.APPROVE_ALWAYS) }) { Text("Always  A") }
-            TextButton(onClick = { onDecide(ApprovalDecision.DENY) }) { Text("Deny  N", color = MaterialTheme.colorScheme.error) }
+            EmberButton("Allow  Y", onClick = { onDecide(ApprovalDecision.APPROVE) })
+            EmberGhostButton("Always  A", onClick = { onDecide(ApprovalDecision.APPROVE_ALWAYS) })
+            EmberTextButton("Deny  N", onClick = { onDecide(ApprovalDecision.DENY) }, danger = true)
         }
     }
 }
@@ -198,17 +193,23 @@ private fun ApprovalCard(summary: String, onDecide: (ApprovalDecision) -> Unit) 
 private fun Composer(model: AppModel) {
     var input by remember { mutableStateOf("") }
     fun submit() { model.send(input); input = "" }
+    val shape = RoundedCornerShape(14.dp)
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(
+        Column(
+            Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outline, shape).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            EmberField(
                 value = input, onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Message Koda…") },
-                singleLine = true,
-                keyboardActions = KeyboardActions(onSend = { submit() }),
+                placeholder = "Message Koda…    / for commands",
+                modifier = Modifier.fillMaxWidth(), bordered = false, onSubmit = ::submit,
             )
-            ModeChip(model)
-            Button(onClick = ::submit, enabled = input.isNotBlank()) { Text("Send") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ModeChip(model)
+                Spacer(Modifier.weight(1f))
+                EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank())
+            }
         }
     }
 }

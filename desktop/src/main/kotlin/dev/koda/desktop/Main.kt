@@ -30,7 +30,7 @@ import dev.koda.protocol.ApprovalDecision
  * connects to a Koda daemon over WebSocket (KODA_DAEMON, default
  * ws://127.0.0.1:4477) and drives the same agent as the CLI/TUI.
  */
-fun main() = application {
+fun main(): Unit = application {
     val scope = rememberCoroutineScope()
     val model = remember { AppModel(DaemonClient(scope), scope) }
     var palette by remember { mutableStateOf(false) }

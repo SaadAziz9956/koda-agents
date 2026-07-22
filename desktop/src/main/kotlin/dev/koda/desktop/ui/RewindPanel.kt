@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,17 +56,13 @@ fun RewindPanel(model: AppModel, modifier: Modifier = Modifier) {
         Column(Modifier.padding(14.dp)) {
             val target = selected
             if (target == null) {
-                Button(onClick = { if (model.checkpoints.isNotEmpty()) selected = 1 }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Rewind last turn")
-                }
+                EmberButton("Rewind last turn", onClick = { if (model.checkpoints.isNotEmpty()) selected = 1 }, modifier = Modifier.fillMaxWidth())
             } else {
                 Text("Rewind $target turn(s)?", fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.size(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { model.rewind(target); selected = null }, modifier = Modifier.weight(1f)) {
-                        Text("Rewind")
-                    }
-                    TextButton(onClick = { selected = null }) { Text("Cancel") }
+                    EmberButton("Rewind", onClick = { model.rewind(target); selected = null }, modifier = Modifier.weight(1f))
+                    EmberTextButton("Cancel", onClick = { selected = null })
                 }
             }
         }
