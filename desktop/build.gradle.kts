@@ -1,8 +1,9 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
-    application
 }
 
 kotlin {
@@ -21,6 +22,16 @@ dependencies {
     runtimeOnly(libs.slf4j.nop)
 }
 
-application {
-    mainClass.set("dev.koda.desktop.MainKt")
+// Compose Desktop's own application config — provides the `run` task that
+// launches the window with correct macOS main-thread/AWT setup (the plain
+// `application` plugin does not), plus native packaging.
+compose.desktop {
+    application {
+        mainClass = "dev.koda.desktop.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
+            packageName = "Koda"
+            packageVersion = "1.0.0"
+        }
+    }
 }
