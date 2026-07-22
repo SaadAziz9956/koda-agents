@@ -24,12 +24,24 @@ interface KodaTool {
     suspend fun execute(args: JsonObject, ctx: ToolContext): ToolResult
 }
 
+/**
+ * Notified by mutating file tools just before they change a path, so a
+ * checkpoint layer can capture the prior state for undo (see /rewind). The
+ * core supplies the implementation; tools stay ignorant of what it does.
+ */
+fun interface FileSnapshotSink {
+    fun capture(path: Path)
+}
+
 /** Per-session state shared across tool invocations. */
 class ToolContext(
     val cwd: Path,
 ) {
     /** Files the model has Read this session — required before Edit/Write of existing files. */
     val readFiles: MutableSet<Path> = mutableSetOf()
+
+    /** Set by the core; mutating file tools call it before writing, for checkpoint/undo. */
+    var snapshotSink: FileSnapshotSink? = null
 
     /** Session todo list (see [TodoTool]). */
     val todos: MutableList<TodoItem> = mutableListOf()

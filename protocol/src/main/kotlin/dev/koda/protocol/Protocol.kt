@@ -95,6 +95,19 @@ data class LoadHistory(
     override val sessionId: String,
 ) : Submission
 
+/**
+ * Undo the last [steps] turns: restore the conversation to before them and
+ * revert files those turns changed via the write/edit tools. Answered with
+ * [RewindResult].
+ */
+@Serializable
+@SerialName("rewind")
+data class Rewind(
+    override val id: String,
+    override val sessionId: String,
+    val steps: Int = 1,
+) : Submission
+
 /** Change the permission mode of a running session. */
 @Serializable
 @SerialName("set_permission_mode")
@@ -191,6 +204,21 @@ data class SessionHistory(
 
 @Serializable
 data class HistoryMessage(val role: String, val text: String)
+
+/** Answer to [Rewind]. */
+@Serializable
+@SerialName("rewind_result")
+data class RewindResult(
+    override val sessionId: String,
+    val ok: Boolean,
+    /** Turns actually undone (may be fewer than requested). */
+    val steps: Int,
+    /** Conversation message count after the rewind. */
+    val messagesAfter: Int,
+    /** Paths reverted (restored or deleted) by the rewind. */
+    val filesRestored: List<String>,
+    val message: String,
+) : Event
 
 /** Informational message from the core (startup notices, MCP connect results). */
 @Serializable

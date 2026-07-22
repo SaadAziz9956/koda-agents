@@ -10,6 +10,8 @@ import dev.koda.protocol.ListSessions
 import dev.koda.protocol.ListSkills
 import dev.koda.protocol.McpServerList
 import dev.koda.protocol.PermissionModeSetting
+import dev.koda.protocol.Rewind
+import dev.koda.protocol.RewindResult
 import dev.koda.protocol.SessionCompacted
 import dev.koda.protocol.SessionList
 import dev.koda.protocol.SetPermissionMode
@@ -103,6 +105,15 @@ val COMMANDS: List<CliCommand> = listOf(
         ctx.core.submit(CompactSession(UUID.randomUUID().toString(), ctx.state.sessionId))
         ctx.inbox.awaitFirst<SessionCompacted>()?.let {
             println("${DIM}compacted: ${it.messagesBefore} -> ${it.messagesAfter} messages${RESET}")
+        }
+    },
+
+    CliCommand("rewind", "/rewind [n]", "Undo the last n turns (conversation + file edits)") { ctx, arg ->
+        val steps = arg?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        ctx.core.submit(Rewind(UUID.randomUUID().toString(), ctx.state.sessionId, steps))
+        ctx.inbox.awaitFirst<RewindResult>()?.let {
+            val color = if (it.ok) DIM else YELLOW
+            println("$color⏪ ${it.message}$RESET")
         }
     },
 

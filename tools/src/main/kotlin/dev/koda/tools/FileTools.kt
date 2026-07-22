@@ -81,6 +81,7 @@ class WriteTool : KodaTool {
                 "Refusing to overwrite $path: read it first so you know what you are replacing."
             )
         }
+        ctx.snapshotSink?.capture(path)
         path.createParentDirectories()
         path.writeText(content)
         ctx.readFiles.add(path)
@@ -131,6 +132,7 @@ class EditTool : KodaTool {
 
         val updated = if (replaceAll) content.replace(oldString, newString)
         else content.replaceFirst(oldString, newString)
+        ctx.snapshotSink?.capture(path)
         path.writeText(updated)
 
         val n = if (replaceAll) occurrences else 1

@@ -89,6 +89,7 @@ private val COMMANDS = listOf(
     TuiCmd("sessions", "list saved sessions"),
     TuiCmd("clear", "clear the screen"),
     TuiCmd("compact", "compress conversation history"),
+    TuiCmd("rewind", "undo the last n turns: /rewind [n]"),
     TuiCmd("skills", "list available skills"),
     TuiCmd("mcp", "list connected MCP servers"),
     TuiCmd("model", "show the current model"),
@@ -159,6 +160,7 @@ private fun KodaApp(
                 is TokenUsage -> if (ev.sessionId == sessionId) usedTokens = ev.inputTokens
                 is Notice -> add(Item.Note(seq, ev.text, KodaColors.dim))
                 is SessionCompacted -> add(Item.Note(seq, "compacted: ${ev.messagesBefore} → ${ev.messagesAfter} messages", KodaColors.dim))
+                is dev.koda.protocol.RewindResult -> if (ev.sessionId == sessionId) add(Item.Note(seq, "⏪ ${ev.message}", if (ev.ok) KodaColors.dim else KodaColors.warn))
                 is ErrorEvent -> add(Item.Note(seq, "error: ${ev.message}", KodaColors.err))
                 is SessionList -> add(Item.Note(seq, "sessions:\n" + (ev.sessions.joinToString("\n") { "  ${it.id}  ·  ${it.messageCount} msgs" }.ifEmpty { "  (none)" }), KodaColors.dim))
                 is SkillList -> add(Item.Note(seq, "skills (${ev.skills.size}): " + ev.skills.take(40).joinToString(", ") { it.name }, KodaColors.dim))
@@ -208,6 +210,10 @@ private fun KodaApp(
             }
             "clear" -> { transcript.clear(); seq++ }
             "compact" -> scope.launch { core.submit(CompactSession(id(), sessionId)) }
+            "rewind" -> {
+                val steps = arg?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                scope.launch { core.submit(dev.koda.protocol.Rewind(id(), sessionId, steps)) }
+            }
             "sessions" -> scope.launch { core.submit(ListSessions(id(), sessionId)) }
             "skills" -> scope.launch { core.submit(ListSkills(id(), sessionId)) }
             "mcp" -> scope.launch { core.submit(ListMcpServers(id(), sessionId)) }

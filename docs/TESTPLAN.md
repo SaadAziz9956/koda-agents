@@ -122,12 +122,19 @@ Local (no Meta needed), `KODA_WHATSAPP_ALLOWED=<id>`, `WHATSAPP_VERIFY_TOKEN=t`:
 End-to-end [live, Meta]:
 - [ ] via a tunnel + real creds: message the number → agent replies; a gated tool → chat asks yes/no.
 
-## 14. Daemon (optional)  [live]
+## 14. Rewind (v0.15)  [live]
+- [ ] `/rewind` with no turns yet → "nothing to rewind".
+- [ ] one turn that creates `foo.txt`, then `/rewind` → conversation drops back a turn and `foo.txt` is gone.
+- [ ] a turn that edits an existing file, then `/rewind` → file content is restored to before the turn.
+- [ ] two turns editing files, `/rewind 2` → both reverted; message reports turns undone + files reverted + message count.
+- [ ] (known limit) a file changed via the **bash** tool is *not* reverted by rewind.
+
+## 15. Daemon (optional)  [live]
 - [ ] `./gradlew :daemon:run` → connect with `websocat ws://127.0.0.1:4477/ws`, send a `user_turn` frame, observe event stream.
 
 ---
 
 ## Division of labor
-- **You run [live]** (needs a key): §1–§9, §12.
+- **You run [live]** (needs a key): §1–§9, §12, §14.
 - **You run [term]** (real terminal): §10, §11.
 - **Linux box / CI:** §9 [linux].

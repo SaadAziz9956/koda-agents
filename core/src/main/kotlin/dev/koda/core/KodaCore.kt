@@ -84,6 +84,7 @@ class KodaCore(
     private val submissions = Channel<Submission>(Channel.UNLIMITED)
     private val _events = MutableSharedFlow<Event>(extraBufferCapacity = 4096)
     private val sessions = ConcurrentHashMap<String, SessionRuntime>()
+    private val checkpoints = ConcurrentHashMap<String, SessionCheckpoints>()
 
     private val hooks: HookRunner = HookLoader.load(config.kodaHome, config.cwd) { _events.emit(it) }
 
@@ -159,6 +160,30 @@ class KodaCore(
                     }
                     _events.emit(dev.koda.protocol.SessionHistory(submission.sessionId, history))
                 }
+                is dev.koda.protocol.Rewind -> {
+                    val outcome = checkpoints[submission.sessionId]?.rewind(submission.steps)
+                    if (outcome == null) {
+                        _events.emit(
+                            dev.koda.protocol.RewindResult(
+                                submission.sessionId, ok = false, steps = 0, messagesAfter = 0,
+                                filesRestored = emptyList(), message = "nothing to rewind",
+                            )
+                        )
+                    } else {
+                        val session = sessions[submission.sessionId]?.session
+                        session?.let { it.prompt = outcome.promptBefore; it.persist() }
+                        val messages = outcome.promptBefore?.messages?.size ?: 0
+                        val files = outcome.filesRestored
+                        val fileNote = if (files.isEmpty()) "no files changed" else "${files.size} file(s) reverted"
+                        _events.emit(
+                            dev.koda.protocol.RewindResult(
+                                submission.sessionId, ok = true, steps = outcome.steps,
+                                messagesAfter = messages, filesRestored = files,
+                                message = "rewound ${outcome.steps} turn(s); $fileNote; conversation now $messages messages",
+                            )
+                        )
+                    }
+                }
                 is SetPermissionMode ->
                     runtimeFor(submission.sessionId).session.permissions.updateMode(
                         when (submission.mode) {
@@ -194,10 +219,15 @@ class KodaCore(
 
     private suspend fun runtimeFor(sessionId: String): SessionRuntime {
         sessions[sessionId]?.let { return it }
+        val sessionCheckpoints = SessionCheckpoints()
+        checkpoints[sessionId] = sessionCheckpoints
         val session = AgentSession(
             id = sessionId,
             systemPrompt = SystemPrompt.build(config, skills, memory),
-            toolContext = ToolContext(config.cwd).apply { this.skills.putAll(this@KodaCore.skills) },
+            toolContext = ToolContext(config.cwd).apply {
+                this.skills.putAll(this@KodaCore.skills)
+                snapshotSink = dev.koda.tools.FileSnapshotSink { sessionCheckpoints.capture(it) }
+            },
             permissions = permissionPolicyFactory(),
             approvals = ApprovalBroker(),
             repository = repository,
@@ -280,7 +310,11 @@ class KodaCore(
                 for (work in workQueue) {
                     val job = scope.launch {
                         when (work) {
-                            is SessionWork.Turn -> engine.runTurn(session, registry, work.text)
+                            is SessionWork.Turn -> {
+                                // Open an undo checkpoint over the committed pre-turn state.
+                                checkpoints[session.id]?.begin(session.prompt, work.text)
+                                engine.runTurn(session, registry, work.text)
+                            }
                             is SessionWork.Compact -> engine.compact(session, registry)
                         }
                     }
