@@ -43,10 +43,12 @@ import dev.koda.protocol.SessionList
 import dev.koda.protocol.SessionStarted
 import dev.koda.protocol.SetPermissionMode
 import dev.koda.protocol.SkillList
+import dev.koda.protocol.TextDelta
 import dev.koda.protocol.TokenUsage
 import dev.koda.protocol.ToolBegin
 import dev.koda.protocol.ToolEnd
 import dev.koda.protocol.TurnCompleted
+import dev.koda.protocol.TurnStarted
 import dev.koda.protocol.TurnStopReason
 import dev.koda.protocol.UserTurn
 import java.nio.file.Path
@@ -122,6 +124,10 @@ private fun KodaApp(
     var input by remember { mutableStateOf("") }
     var cursor by remember { mutableStateOf(0) }
     var working by remember { mutableStateOf(false) }
+    // Live assistant text for the in-flight iteration: accumulates TextDelta
+    // chunks and renders in the mutable frame, then commits to the static
+    // transcript as a finished item when AssistantMessage arrives.
+    var streaming by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<ApprovalRequest?>(null) }
     var contextLength by remember { mutableStateOf(0L) }
     var usedTokens by remember { mutableStateOf(0L) }
@@ -140,8 +146,15 @@ private fun KodaApp(
         core.events.collect { ev ->
             when (ev) {
                 is SessionStarted -> if (ev.sessionId == sessionId) contextLength = ev.contextLength
-                is AssistantMessage -> if (ev.text.isNotBlank()) add(Item.Assistant(seq, ev.text))
-                is ToolBegin -> add(Item.Tool(seq, "⚙ ${ev.toolName} ${ev.argsJson.take(120)}", false))
+                is TurnStarted -> if (ev.sessionId == sessionId) streaming = ""
+                is TextDelta -> if (ev.sessionId == sessionId) streaming += ev.text
+                is AssistantMessage -> {
+                    // Commit the finished text and drop the live buffer in one
+                    // recomposition — no flicker between the two.
+                    if (ev.text.isNotBlank()) add(Item.Assistant(seq, ev.text))
+                    streaming = ""
+                }
+                is ToolBegin -> { streaming = ""; add(Item.Tool(seq, "⚙ ${ev.toolName} ${ev.argsJson.take(120)}", false)) }
                 is ToolEnd -> {
                     val mark = if (ev.isError) "✗" else "✓"
                     add(Item.Tool(seq, "$mark ${ev.toolName}: ${ev.output.lineSequence().firstOrNull()?.take(110) ?: ""}", ev.isError))
@@ -163,6 +176,7 @@ private fun KodaApp(
                 is McpServerList -> add(Item.Note(seq, if (ev.servers.isEmpty()) "no MCP servers connected" else "mcp: " + ev.servers.joinToString(", ") { "${it.name}(${it.toolNames.size})" }, KodaColors.dim))
                 is TurnCompleted -> {
                     working = false
+                    streaming = ""
                     when (ev.stopReason) {
                         TurnStopReason.MAX_ITERATIONS -> add(Item.Note(seq, "(stopped: max iterations)", KodaColors.warn))
                         TurnStopReason.INTERRUPTED -> add(Item.Note(seq, "(interrupted)", KodaColors.warn))
@@ -296,6 +310,12 @@ private fun KodaApp(
         },
     ) {
         Text("")
+        // The in-flight assistant message, streamed token-by-token. Lives in the
+        // mutable frame until AssistantMessage commits it to the static transcript.
+        if (streaming.isNotBlank()) {
+            MarkdownText(streaming)
+            Text("")
+        }
         val prompt = pending
         if (prompt != null) {
             // Approval: options must always be visible — truncate the command, never the choices.

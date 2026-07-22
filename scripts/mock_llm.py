@@ -100,9 +100,19 @@ class Handler(BaseHTTPRequestHandler):
             delta = dict(message)
             if "tool_calls" in delta:
                 delta["tool_calls"] = [{**c, "index": i} for i, c in enumerate(delta["tool_calls"])]
-            self.wfile.write(sse({"id": "cmpl-1", "object": "chat.completion.chunk",
-                                  "created": 1700000000, "model": body.get("model", "mock-1"),
-                                  "choices": [{"index": 0, "delta": delta, "finish_reason": None}]}))
+                self.wfile.write(sse({"id": "cmpl-1", "object": "chat.completion.chunk",
+                                      "created": 1700000000, "model": body.get("model", "mock-1"),
+                                      "choices": [{"index": 0, "delta": delta, "finish_reason": None}]}))
+            else:
+                # Emit text word-by-word so surfaces can show real token-by-token streaming.
+                content = delta.get("content") or ""
+                import re as _re
+                for i, piece in enumerate(_re.findall(r"\S+\s*", content) or [content]):
+                    chunk = {"role": "assistant", "content": piece} if i == 0 else {"content": piece}
+                    self.wfile.write(sse({"id": "cmpl-1", "object": "chat.completion.chunk",
+                                          "created": 1700000000, "model": body.get("model", "mock-1"),
+                                          "choices": [{"index": 0, "delta": chunk, "finish_reason": None}]}))
+                    self.wfile.flush()
             self.wfile.write(sse({"id": "cmpl-1", "object": "chat.completion.chunk",
                                   "created": 1700000000, "model": body.get("model", "mock-1"),
                                   "choices": [{"index": 0, "delta": {}, "finish_reason": finish}],
