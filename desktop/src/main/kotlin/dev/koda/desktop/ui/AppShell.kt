@@ -47,10 +47,13 @@ import dev.koda.desktop.theme.Ember
 import dev.koda.protocol.ApprovalDecision
 import dev.koda.protocol.PermissionModeSetting
 
+enum class AppView { Home, Code }
+
 @Composable
 fun AppShell(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: () -> Unit) {
+    var view by remember { mutableStateOf(AppView.Code) }
     Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Rail(model, Modifier.width(230.dp).fillMaxHeight())
+        Rail(model, view, { view = it }, Modifier.width(230.dp).fillMaxHeight())
         VDivider()
         Column(Modifier.weight(1f).fillMaxHeight()) {
             TopBar(model, onOpenPalette, onOpenSettings)
@@ -60,8 +63,11 @@ fun AppShell(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: () -> U
             HDivider()
             Composer(model)
         }
-        VDivider()
-        ContextPanel(model, Modifier.width(320.dp).fillMaxHeight())
+        // The coding workspace (Files/Git/Rewind) only shows in Code view.
+        if (view == AppView.Code) {
+            VDivider()
+            ContextPanel(model, Modifier.width(320.dp).fillMaxHeight())
+        }
     }
 }
 

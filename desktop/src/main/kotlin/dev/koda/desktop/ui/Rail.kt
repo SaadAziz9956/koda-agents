@@ -3,6 +3,7 @@ package dev.koda.desktop.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,8 +30,10 @@ import dev.koda.desktop.ConnStatus
 import dev.koda.desktop.theme.Ember
 
 @Composable
-fun Rail(model: AppModel, modifier: Modifier = Modifier) {
+fun Rail(model: AppModel, view: AppView, onSelectView: (AppView) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        ViewToggle(view, onSelectView)
+        HDivider()
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 16.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -58,6 +61,35 @@ fun Rail(model: AppModel, modifier: Modifier = Modifier) {
                 if (model.status == ConnStatus.Connected) Ember.ok else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun ViewToggle(view: AppView, onSelect: (AppView) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(10.dp).clip(RoundedCornerShape(9.dp))
+            .background(MaterialTheme.colorScheme.background).padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        ViewTab("Home", view == AppView.Home, Modifier.weight(1f)) { onSelect(AppView.Home) }
+        ViewTab("Code", view == AppView.Code, Modifier.weight(1f)) { onSelect(AppView.Code) }
+    }
+}
+
+@Composable
+private fun ViewTab(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.clip(RoundedCornerShape(7.dp))
+            .background(if (active) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
+            .clickable(onClick = onClick).padding(vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            fontSize = 12.5f.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
