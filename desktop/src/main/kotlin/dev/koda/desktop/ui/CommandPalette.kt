@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.LaunchedEffect
 import dev.koda.desktop.AppModel
 import dev.koda.desktop.theme.Ember
+import dev.koda.protocol.PermissionModeSetting
 
 private data class PaletteItem(val group: String, val label: String, val hint: String, val run: () -> Unit)
 
@@ -54,6 +55,10 @@ fun CommandPalette(model: AppModel, onClose: () -> Unit, onOpenSettings: () -> U
 
     val items = buildList {
         add(PaletteItem("Commands", "New session", "/new") { model.newSession() })
+        add(PaletteItem("Commands", "Review uncommitted changes", "/review") { model.review("uncommitted") })
+        add(PaletteItem("Commands", "Toggle plan mode", "/plan") {
+            model.changeMode(if (model.mode == PermissionModeSetting.PLAN) PermissionModeSetting.DEFAULT else PermissionModeSetting.PLAN)
+        })
         add(PaletteItem("Commands", "Rewind last turn", "/rewind") { model.rewind(1) })
         add(PaletteItem("Commands", "Compact history", "/compact") { model.compact() })
         add(PaletteItem("Commands", "Settings", "⚙") { onOpenSettings() })

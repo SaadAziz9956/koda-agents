@@ -20,6 +20,8 @@ import dev.koda.protocol.GitFileChange
 import dev.koda.protocol.GitStatus
 import dev.koda.protocol.ListDir
 import dev.koda.protocol.PrResult
+import dev.koda.protocol.ReviewRequest
+import dev.koda.protocol.SetModel
 import dev.koda.protocol.ApprovalRequest
 import dev.koda.protocol.ApprovalResponse
 import dev.koda.protocol.AssistantMessage
@@ -218,10 +220,20 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     // --- actions ---
     fun connect(url: String) { daemonUrl = url.trim(); client.connect(daemonUrl) }
 
-    fun send(text: String) {
-        val t = text.trim(); if (t.isEmpty()) return
-        add { Line.User(it, t) }; working = true
-        scope.launch { client.submit(UserTurn(id(), sessionId, t)) }
+    fun send(text: String, attachments: List<String> = emptyList()) {
+        val t = text.trim(); if (t.isEmpty() && attachments.isEmpty()) return
+        val shown = if (attachments.isEmpty()) t else "$t  📎${attachments.size}"
+        add { Line.User(it, shown) }; working = true
+        scope.launch { client.submit(UserTurn(id(), sessionId, t, attachments)) }
+    }
+
+    fun review(target: String) {
+        working = true
+        scope.launch { client.submit(ReviewRequest(id(), sessionId, target)) }
+    }
+
+    fun setModelId(modelId: String) {
+        if (modelId.isNotBlank()) scope.launch { client.submit(SetModel(id(), sessionId, modelId)) }
     }
 
     fun approve(decision: ApprovalDecision) {

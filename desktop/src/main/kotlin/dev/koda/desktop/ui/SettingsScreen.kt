@@ -18,7 +18,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +67,13 @@ fun SettingsScreen(model: AppModel, onClose: () -> Unit) {
             Section("Model")
             FieldRow("Model", model.modelName.ifBlank { "—" })
             FieldRow("Provider", model.providerName.ifBlank { "—" })
+            var newModel by remember { mutableStateOf("") }
+            Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Switch model", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                EmberField(newModel, { newModel = it }, "model id", Modifier.width(180.dp), mono = true)
+                Spacer(Modifier.width(8.dp))
+                EmberButton("Set", onClick = { model.setModelId(newModel); newModel = "" })
+            }
 
             Spacer(Modifier.size(16.dp))
             Section("Appearance")

@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -281,7 +282,8 @@ private fun ApprovalCard(summary: String, onDecide: (ApprovalDecision) -> Unit) 
 @Composable
 private fun Composer(model: AppModel) {
     var input by remember { mutableStateOf("") }
-    fun submit() { model.send(input); input = "" }
+    val attachments = remember { mutableStateListOf<String>() }
+    fun submit() { model.send(input, attachments.toList()); input = ""; attachments.clear() }
     val shape = RoundedCornerShape(14.dp)
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(16.dp)) {
         Column(
@@ -289,6 +291,18 @@ private fun Composer(model: AppModel) {
                 .border(1.dp, MaterialTheme.colorScheme.outline, shape).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (attachments.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    attachments.forEach { a ->
+                        Box(
+                            Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.outline, ChipShape)
+                                .clickable { attachments.remove(a) }.padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text("📎 ${a.substringAfterLast('/')}  ✕", fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
             EmberField(
                 value = input, onValueChange = { input = it },
                 placeholder = "Message Koda…    / for commands",
@@ -296,14 +310,32 @@ private fun Composer(model: AppModel) {
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ModeChip(model)
+                Spacer(Modifier.width(8.dp))
+                AttachButton { attachments.add(it) }
                 Spacer(Modifier.weight(1f))
                 if (model.working) {
                     EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
                     Spacer(Modifier.width(8.dp))
                 }
-                EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank())
+                EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
             }
         }
+    }
+}
+
+@Composable
+private fun AttachButton(onPick: (String) -> Unit) {
+    Box(
+        Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.outline, ChipShape)
+            .clickable {
+                val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Attach image", java.awt.FileDialog.LOAD)
+                dialog.isVisible = true
+                val f = dialog.file; val dir = dialog.directory
+                if (f != null && dir != null) onPick(java.io.File(dir, f).absolutePath)
+            }
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+    ) {
+        Text("📎", fontSize = 13.sp)
     }
 }
 
