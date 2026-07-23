@@ -22,6 +22,7 @@ import dev.koda.desktop.theme.KodaTheme
 import dev.koda.desktop.ui.AppShell
 import dev.koda.desktop.ui.CommandPalette
 import dev.koda.desktop.ui.ConnectScreen
+import dev.koda.desktop.ui.FileViewer
 import dev.koda.desktop.ui.SettingsScreen
 import dev.koda.protocol.ApprovalDecision
 
@@ -78,5 +79,6 @@ private fun AppRoot(
         AppShell(model, onOpenPalette = { setPalette(true) }, onOpenSettings = { setSettings(true) })
         if (palette) CommandPalette(model, onClose = { setPalette(false) }, onOpenSettings = { setSettings(true) })
         if (settings) SettingsScreen(model, onClose = { setSettings(false) })
+        if (model.openFilePath != null) FileViewer(model)
     }
 }

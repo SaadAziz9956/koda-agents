@@ -2,9 +2,24 @@ package dev.koda.desktop
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.koda.protocol.ApprovalDecision
+import dev.koda.protocol.CreatePr
+import dev.koda.protocol.DirEntry
+import dev.koda.protocol.DirListing
+import dev.koda.protocol.FileContent
+import dev.koda.protocol.GetFile
+import dev.koda.protocol.GetGitDiff
+import dev.koda.protocol.GetGitStatus
+import dev.koda.protocol.GitCommit
+import dev.koda.protocol.GitCommitResult
+import dev.koda.protocol.GitDiff
+import dev.koda.protocol.GitFileChange
+import dev.koda.protocol.GitStatus
+import dev.koda.protocol.ListDir
+import dev.koda.protocol.PrResult
 import dev.koda.protocol.ApprovalRequest
 import dev.koda.protocol.ApprovalResponse
 import dev.koda.protocol.AssistantMessage
@@ -75,6 +90,22 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     val checkpoints = mutableStateListOf<CheckpointInfo>()
     var pendingApproval by mutableStateOf<ApprovalRequest?>(null); private set
 
+    // File explorer state
+    val dirCache = mutableStateMapOf<String, List<DirEntry>>()
+    val expandedDirs = mutableStateListOf<String>()
+    var openFilePath by mutableStateOf<String?>(null); private set
+    var openFileContent by mutableStateOf(""); private set
+    var openFileError by mutableStateOf<String?>(null); private set
+
+    // Git state
+    var gitOk by mutableStateOf(false); private set
+    var gitBranch by mutableStateOf(""); private set
+    var gitAhead by mutableStateOf(0); private set
+    var gitBehind by mutableStateOf(0); private set
+    val gitFiles = mutableStateListOf<GitFileChange>()
+    var gitDiff by mutableStateOf(""); private set
+    var gitDiffPath by mutableStateOf<String?>(null); private set
+
     val contextPercent: Int?
         get() = if (contextLength > 0 && usedTokens > 0) ((usedTokens * 100) / contextLength).toInt().coerceAtMost(100) else null
 
@@ -122,7 +153,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             status = s
             if (s == ConnStatus.Connected && !everConnected) {
                 everConnected = true
-                refreshSessions(); refreshCheckpoints()
+                refreshSessions(); refreshCheckpoints(); loadDir(""); refreshGit()
             }
         }
         scope.launch {
@@ -156,6 +187,15 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     is ErrorEvent -> add { Line.Note(it, "error: ${ev.message}", error = true) }
                     is SessionCompacted -> add { Line.Note(it, "compacted: ${ev.messagesBefore} → ${ev.messagesAfter} messages") }
                     is SessionList -> { sessions.clear(); sessions.addAll(ev.sessions) }
+                    is DirListing -> dirCache[ev.path] = ev.entries
+                    is FileContent -> { openFilePath = ev.path; openFileContent = ev.content; openFileError = ev.error }
+                    is GitStatus -> {
+                        gitOk = ev.ok; gitBranch = ev.branch; gitAhead = ev.ahead; gitBehind = ev.behind
+                        gitFiles.clear(); gitFiles.addAll(ev.files)
+                    }
+                    is GitDiff -> { gitDiff = ev.unified; gitDiffPath = ev.path }
+                    is GitCommitResult -> { add { Line.Note(it, "git: ${ev.message}", error = !ev.ok) }; refreshGit() }
+                    is PrResult -> add { Line.Note(it, "PR: ${ev.message}", error = !ev.ok) }
                     is CheckpointList -> if (ev.sessionId == sessionId) { checkpoints.clear(); checkpoints.addAll(ev.checkpoints) }
                     is dev.koda.protocol.RewindResult -> {
                         add { Line.Note(it, "⏪ ${ev.message}", error = !ev.ok) }
@@ -210,4 +250,17 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
 
     fun refreshSessions() { scope.launch { client.submit(ListSessions(id(), sessionId)) } }
     fun refreshCheckpoints() { scope.launch { client.submit(ListCheckpoints(id(), sessionId)) } }
+
+    fun loadDir(path: String) { scope.launch { client.submit(ListDir(id(), sessionId, path.ifEmpty { null })) } }
+    fun toggleDir(path: String) {
+        if (expandedDirs.contains(path)) expandedDirs.remove(path)
+        else { expandedDirs.add(path); if (!dirCache.containsKey(path)) loadDir(path) }
+    }
+    fun openFile(path: String) { scope.launch { client.submit(GetFile(id(), sessionId, path)) } }
+    fun closeFile() { openFilePath = null }
+
+    fun refreshGit() { scope.launch { client.submit(GetGitStatus(id(), sessionId)) } }
+    fun showGitDiff(path: String?) { scope.launch { client.submit(GetGitDiff(id(), sessionId, path, false)) } }
+    fun gitCommit(message: String) { scope.launch { client.submit(GitCommit(id(), sessionId, message)) } }
+    fun createPr(title: String) { scope.launch { client.submit(CreatePr(id(), sessionId, title, "")) } }
 }

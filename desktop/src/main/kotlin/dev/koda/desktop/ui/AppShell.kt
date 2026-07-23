@@ -60,7 +60,41 @@ fun AppShell(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: () -> U
             Composer(model)
         }
         VDivider()
-        RewindPanel(model, Modifier.width(300.dp).fillMaxHeight())
+        ContextPanel(model, Modifier.width(320.dp).fillMaxHeight())
+    }
+}
+
+@Composable
+private fun ContextPanel(model: AppModel, modifier: Modifier = Modifier) {
+    var tab by remember { mutableStateOf(0) }
+    Column(modifier.background(MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth()) {
+            TabButton("Rewind", tab == 0) { tab = 0 }
+            TabButton("Files", tab == 1) { tab = 1 }
+            TabButton("Git", tab == 2) { tab = 2 }
+        }
+        HDivider()
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (tab) {
+                0 -> RewindPanel(model, Modifier.fillMaxSize())
+                1 -> FileExplorer(model)
+                else -> GitPanel(model, Modifier.fillMaxSize())
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabButton(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
