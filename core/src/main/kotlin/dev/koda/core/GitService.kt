@@ -83,4 +83,21 @@ object GitService {
         return (code == 0) to out.trim().lines().firstOrNull().orEmpty()
             .ifBlank { if (code == 0) "committed" else "commit failed" }
     }
+
+    /** Push the current branch and open a PR with the GitHub CLI. */
+    fun createPr(cwd: Path, title: String, body: String): Pair<Boolean, String> {
+        val branch = run(cwd, "rev-parse", "--abbrev-ref", "HEAD").second.trim()
+        val push = ProcessBuilder("git", "push", "-u", "origin", branch)
+            .directory(cwd.toFile()).redirectErrorStream(true).start()
+        push.inputStream.bufferedReader().readText(); push.waitFor()
+        return try {
+            val p = ProcessBuilder("gh", "pr", "create", "--title", title, "--body", body.ifBlank { title })
+                .directory(cwd.toFile()).redirectErrorStream(true).start()
+            val out = p.inputStream.bufferedReader().readText().trim()
+            p.waitFor()
+            (p.exitValue() == 0) to (out.lines().lastOrNull { it.startsWith("http") } ?: out).ifBlank { "PR created" }
+        } catch (e: Exception) {
+            false to "gh CLI not available: ${e.message}"
+        }
+    }
 }

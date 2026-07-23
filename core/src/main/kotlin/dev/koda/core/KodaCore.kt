@@ -85,6 +85,9 @@ class KodaCore(
     private val _events = MutableSharedFlow<Event>(extraBufferCapacity = 4096)
     private val sessions = ConcurrentHashMap<String, SessionRuntime>()
     private val checkpoints = ConcurrentHashMap<String, SessionCheckpoints>()
+    private val scheduler = Scheduler(scope, config.kodaHome) { sid, prompt ->
+        submit(UserTurn(java.util.UUID.randomUUID().toString(), sid, prompt))
+    }
 
     private val hooks: HookRunner = HookLoader.load(config.kodaHome, config.cwd) { _events.emit(it) }
 
@@ -123,6 +126,7 @@ class KodaCore(
     fun start(): Job = scope.launch {
         _events.emit(Notice("", sandboxNotice))
         connectMcpServers()
+        scheduler.loadAndStart()
         for (submission in submissions) {
             when (submission) {
                 is UserTurn -> runtimeFor(submission.sessionId).enqueue(SessionWork.Turn(submission.text))
@@ -171,6 +175,21 @@ class KodaCore(
                         )
                     )
                 }
+                is dev.koda.protocol.CreatePr -> {
+                    val (ok, msg) = GitService.createPr(config.cwd, submission.title, submission.body)
+                    _events.emit(dev.koda.protocol.PrResult(submission.sessionId, ok, msg))
+                }
+                is dev.koda.protocol.CreateSchedule -> {
+                    val list = scheduler.create(submission.sessionId, submission.prompt, submission.everySeconds)
+                    _events.emit(dev.koda.protocol.ScheduleList(submission.sessionId, list.map { dev.koda.protocol.ScheduleInfo(it.id, it.prompt, it.everySeconds) }))
+                }
+                is dev.koda.protocol.CancelSchedule -> {
+                    val list = scheduler.cancel(submission.scheduleId)
+                    _events.emit(dev.koda.protocol.ScheduleList(submission.sessionId, list.map { dev.koda.protocol.ScheduleInfo(it.id, it.prompt, it.everySeconds) }))
+                }
+                is dev.koda.protocol.ListSchedules -> _events.emit(
+                    dev.koda.protocol.ScheduleList(submission.sessionId, scheduler.list().map { dev.koda.protocol.ScheduleInfo(it.id, it.prompt, it.everySeconds) })
+                )
                 is dev.koda.protocol.ReviewRequest -> {
                     val diff = GitService.reviewDiff(config.cwd, submission.target)
                     if (diff.isBlank()) {

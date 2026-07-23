@@ -131,6 +131,43 @@ data class GitCommit(
     val message: String,
 ) : Submission
 
+/** Push the current branch and open a pull request (via `gh`). Answered with [PrResult]. */
+@Serializable
+@SerialName("create_pr")
+data class CreatePr(
+    override val id: String,
+    override val sessionId: String,
+    val title: String,
+    val body: String = "",
+) : Submission
+
+/** Create a recurring scheduled task (fires [prompt] every [everySeconds]). Answered with [ScheduleList]. */
+@Serializable
+@SerialName("create_schedule")
+data class CreateSchedule(
+    override val id: String,
+    override val sessionId: String,
+    val prompt: String,
+    val everySeconds: Long,
+) : Submission
+
+/** Cancel a scheduled task. Answered with [ScheduleList]. */
+@Serializable
+@SerialName("cancel_schedule")
+data class CancelSchedule(
+    override val id: String,
+    override val sessionId: String,
+    val scheduleId: String,
+) : Submission
+
+/** List scheduled tasks. Answered with [ScheduleList]. */
+@Serializable
+@SerialName("list_schedules")
+data class ListSchedules(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 /** List a workspace directory (relative to the workspace root). Answered with [DirListing]. */
 @Serializable
 @SerialName("list_dir")
@@ -317,6 +354,26 @@ data class GitCommitResult(
     val ok: Boolean,
     val message: String,
 ) : Event
+
+/** Answer to [CreatePr]. `message` is the PR URL on success. */
+@Serializable
+@SerialName("pr_result")
+data class PrResult(
+    override val sessionId: String,
+    val ok: Boolean,
+    val message: String,
+) : Event
+
+/** Answer to schedule submissions: the current set of scheduled tasks. */
+@Serializable
+@SerialName("schedule_list")
+data class ScheduleList(
+    override val sessionId: String,
+    val schedules: List<ScheduleInfo>,
+) : Event
+
+@Serializable
+data class ScheduleInfo(val id: String, val prompt: String, val everySeconds: Long)
 
 /** Answer to [ListDir]: directory entries, directories first. */
 @Serializable
