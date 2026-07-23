@@ -92,7 +92,10 @@ class KoogEngine(
                 response.parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
             }
 
-            val finalText = newAgent(session, registry, strategy = strategy).run(text)
+            // The model sees @file mentions expanded with their contents; hooks
+            // and memory review keep the user's original text.
+            val expanded = expandFileMentions(text, session.toolContext.cwd)
+            val finalText = newAgent(session, registry, strategy = strategy).run(expanded)
             session.persist()
             onTurnCompleted?.invoke(session.id, text, finalText) // non-blocking: launches background review
         } catch (e: CancellationException) {
