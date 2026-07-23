@@ -103,6 +103,34 @@ data class ListCheckpoints(
     override val sessionId: String,
 ) : Submission
 
+/** Ask the core for the working-tree git status. Answered with [GitStatus]. */
+@Serializable
+@SerialName("get_git_status")
+data class GetGitStatus(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
+/** Ask the core for a unified diff (whole tree, or one [path]). Answered with [GitDiff]. */
+@Serializable
+@SerialName("get_git_diff")
+data class GetGitDiff(
+    override val id: String,
+    override val sessionId: String,
+    val path: String? = null,
+    /** Diff staged changes against HEAD instead of the working tree. */
+    val staged: Boolean = false,
+) : Submission
+
+/** Stage all changes and commit. Answered with [GitCommitResult]. */
+@Serializable
+@SerialName("git_commit")
+data class GitCommit(
+    override val id: String,
+    override val sessionId: String,
+    val message: String,
+) : Submission
+
 /**
  * Undo the last [steps] turns: restore the conversation to before them and
  * revert files those turns changed via the write/edit tools. Answered with
@@ -223,6 +251,39 @@ data class CheckpointList(
 
 @Serializable
 data class CheckpointInfo(val index: Int, val label: String, val fileCount: Int)
+
+/** Answer to [GetGitStatus]. `ok=false` when the cwd isn't a git repo. */
+@Serializable
+@SerialName("git_status")
+data class GitStatus(
+    override val sessionId: String,
+    val ok: Boolean,
+    val branch: String,
+    val ahead: Int,
+    val behind: Int,
+    val files: List<GitFileChange>,
+) : Event
+
+@Serializable
+data class GitFileChange(val path: String, val status: String, val staged: Boolean)
+
+/** Answer to [GetGitDiff]: a unified diff (may be empty). */
+@Serializable
+@SerialName("git_diff")
+data class GitDiff(
+    override val sessionId: String,
+    val path: String?,
+    val unified: String,
+) : Event
+
+/** Answer to [GitCommit]. */
+@Serializable
+@SerialName("git_commit_result")
+data class GitCommitResult(
+    override val sessionId: String,
+    val ok: Boolean,
+    val message: String,
+) : Event
 
 /** Answer to [Rewind]. */
 @Serializable

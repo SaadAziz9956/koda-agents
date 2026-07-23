@@ -171,6 +171,25 @@ class KodaCore(
                         )
                     )
                 }
+                is dev.koda.protocol.GetGitStatus -> {
+                    val s = GitService.status(config.cwd)
+                    _events.emit(
+                        dev.koda.protocol.GitStatus(
+                            submission.sessionId, s.ok, s.branch, s.ahead, s.behind,
+                            s.files.map { dev.koda.protocol.GitFileChange(it.path, it.status, it.staged) },
+                        )
+                    )
+                }
+                is dev.koda.protocol.GetGitDiff -> _events.emit(
+                    dev.koda.protocol.GitDiff(
+                        submission.sessionId, submission.path,
+                        GitService.diff(config.cwd, submission.path, submission.staged),
+                    )
+                )
+                is dev.koda.protocol.GitCommit -> {
+                    val (ok, msg) = GitService.commit(config.cwd, submission.message)
+                    _events.emit(dev.koda.protocol.GitCommitResult(submission.sessionId, ok, msg))
+                }
                 is dev.koda.protocol.Rewind -> {
                     val outcome = checkpoints[submission.sessionId]?.rewind(submission.steps)
                     if (outcome == null) {
