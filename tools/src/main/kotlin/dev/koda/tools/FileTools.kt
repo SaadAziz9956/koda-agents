@@ -81,11 +81,13 @@ class WriteTool : KodaTool {
                 "Refusing to overwrite $path: read it first so you know what you are replacing."
             )
         }
+        val previous = if (path.exists()) path.readText() else ""
         ctx.snapshotSink?.capture(path)
         path.createParentDirectories()
         path.writeText(content)
         ctx.readFiles.add(path)
-        return ToolResult("Wrote ${content.length} chars to $path")
+        val rel = runCatching { ctx.cwd.relativize(path).toString() }.getOrDefault(path.toString())
+        return ToolResult("Wrote ${content.length} chars to $path", diff = unifiedDiff(previous, content, rel))
     }
 }
 
@@ -136,7 +138,11 @@ class EditTool : KodaTool {
         path.writeText(updated)
 
         val n = if (replaceAll) occurrences else 1
-        return ToolResult("Replaced $n occurrence${if (n == 1) "" else "s"} in $path")
+        val rel = runCatching { ctx.cwd.relativize(path).toString() }.getOrDefault(path.toString())
+        return ToolResult(
+            "Replaced $n occurrence${if (n == 1) "" else "s"} in $path",
+            diff = unifiedDiff(content, updated, rel),
+        )
     }
 
     private fun String.windowedOccurrences(needle: String): Int {

@@ -107,7 +107,7 @@ class ToolGate(
         val callId = UUID.randomUUID().toString()
         events.emit(ToolBegin(session.id, session.currentTurnId, callId, toolName, effectiveArgs.toString()))
         val result = execute(effectiveArgs)
-        events.emit(ToolEnd(session.id, session.currentTurnId, callId, toolName, result.output, result.isError))
+        events.emit(ToolEnd(session.id, session.currentTurnId, callId, toolName, result.output, result.isError, result.diff))
         hooks.firePostToolUse(session.id, cwd, toolName, effectiveArgs, result.output, result.isError)
         if (result.isError) return "ERROR: ${result.output}"
         return result.output + subtreeContext(toolName, effectiveArgs)

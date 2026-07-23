@@ -131,6 +131,25 @@ data class GitCommit(
     val message: String,
 ) : Submission
 
+/** List a workspace directory (relative to the workspace root). Answered with [DirListing]. */
+@Serializable
+@SerialName("list_dir")
+data class ListDir(
+    override val id: String,
+    override val sessionId: String,
+    /** Path relative to the workspace root; null/empty = root. */
+    val path: String? = null,
+) : Submission
+
+/** Read a workspace file's contents. Answered with [FileContent]. */
+@Serializable
+@SerialName("get_file")
+data class GetFile(
+    override val id: String,
+    override val sessionId: String,
+    val path: String,
+) : Submission
+
 /**
  * Undo the last [steps] turns: restore the conversation to before them and
  * revert files those turns changed via the write/edit tools. Answered with
@@ -285,6 +304,29 @@ data class GitCommitResult(
     val message: String,
 ) : Event
 
+/** Answer to [ListDir]: directory entries, directories first. */
+@Serializable
+@SerialName("dir_listing")
+data class DirListing(
+    override val sessionId: String,
+    val path: String,
+    val entries: List<DirEntry>,
+) : Event
+
+@Serializable
+data class DirEntry(val name: String, val path: String, val isDir: Boolean)
+
+/** Answer to [GetFile]. `error` non-null when the file can't be served. */
+@Serializable
+@SerialName("file_content")
+data class FileContent(
+    override val sessionId: String,
+    val path: String,
+    val content: String,
+    val truncated: Boolean = false,
+    val error: String? = null,
+) : Event
+
 /** Answer to [Rewind]. */
 @Serializable
 @SerialName("rewind_result")
@@ -361,6 +403,8 @@ data class ToolEnd(
     val toolName: String,
     val output: String,
     val isError: Boolean = false,
+    /** Unified diff when the tool changed a file (write/edit), for diff-review UI. */
+    val diff: String? = null,
 ) : Event
 
 /**

@@ -121,7 +121,7 @@ class KodaCore(
     val events: SharedFlow<Event> get() = _events
 
     fun start(): Job = scope.launch {
-        _events.emit(dev.koda.protocol.Notice("", sandboxNotice))
+        _events.emit(Notice("", sandboxNotice))
         connectMcpServers()
         for (submission in submissions) {
             when (submission) {
@@ -169,6 +169,25 @@ class KodaCore(
                                 dev.koda.protocol.CheckpointInfo(i + 1, label, files)
                             },
                         )
+                    )
+                }
+                is dev.koda.protocol.ListDir -> {
+                    val listed = WorkspaceService.list(config.cwd, submission.path)
+                    if (listed == null) {
+                        _events.emit(dev.koda.protocol.DirListing(submission.sessionId, submission.path.orEmpty(), emptyList()))
+                    } else {
+                        _events.emit(
+                            dev.koda.protocol.DirListing(
+                                submission.sessionId, listed.first,
+                                listed.second.map { dev.koda.protocol.DirEntry(it.name, it.relPath, it.isDir) },
+                            )
+                        )
+                    }
+                }
+                is dev.koda.protocol.GetFile -> {
+                    val r = WorkspaceService.read(config.cwd, submission.path)
+                    _events.emit(
+                        dev.koda.protocol.FileContent(submission.sessionId, submission.path, r.content, r.truncated, r.error)
                     )
                 }
                 is dev.koda.protocol.GetGitStatus -> {

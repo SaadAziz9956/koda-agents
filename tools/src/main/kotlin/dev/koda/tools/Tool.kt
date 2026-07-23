@@ -63,6 +63,8 @@ data class TodoItem(val text: String, var done: Boolean = false)
 data class ToolResult(
     val output: String,
     val isError: Boolean = false,
+    /** Optional unified diff of a file change, for the UI to render (not shown to the model). */
+    val diff: String? = null,
 ) {
     companion object {
         fun error(message: String) = ToolResult(message, isError = true)
