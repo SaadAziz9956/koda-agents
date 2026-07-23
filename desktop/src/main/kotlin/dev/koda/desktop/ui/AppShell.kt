@@ -169,7 +169,7 @@ private fun Transcript(model: AppModel) {
             count == 0 || last >= count - 1
         }
     }
-    LaunchedEffect(total, model.streaming, model.reasoning) {
+    LaunchedEffect(total, model.streaming, model.reasoning, model.activity) {
         if (total > 0 && atBottom) state.scrollToItem(total - 1)
     }
     LazyColumn(
@@ -181,6 +181,9 @@ private fun Transcript(model: AppModel) {
         items(model.lines, key = { it.key }) { line -> LineView(line) }
         if (model.reasoning.isNotBlank()) item(key = -3) { ReasoningBlock(model.reasoning) }
         if (model.streaming.isNotBlank()) item(key = -1) { StreamingLine(model.streaming) }
+        if (model.working && model.streaming.isBlank() && model.reasoning.isBlank()) {
+            item(key = -4) { ActivityLine(model.activity ?: "Working…") }
+        }
         model.pendingApproval?.let { req -> item(key = -2) { ApprovalCard(req.summary) { model.approve(it) } } }
     }
 }
@@ -188,12 +191,21 @@ private fun Transcript(model: AppModel) {
 @Composable
 private fun LineView(line: Line) {
     when (line) {
-        is Line.User -> Column {
+        is Line.User -> Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                .padding(13.dp),
+        ) {
             Text("YOU", fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.size(5.dp))
-            Text(line.text, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Spacer(Modifier.size(6.dp))
+            Text(line.text, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 14.sp)
         }
-        is Line.Assistant -> MarkdownText(line.text)
+        is Line.Assistant -> Column(Modifier.fillMaxWidth()) {
+            Text("KODA", fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.size(6.dp))
+            MarkdownText(line.text)
+        }
         is Line.Tool -> ToolCard(line)
         is Line.Note -> Text(
             line.text,
@@ -226,13 +238,24 @@ private fun StreamingLine(text: String) {
 }
 
 @Composable
+private fun ActivityLine(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().shimmer()) {
+        Dot(MaterialTheme.colorScheme.primary, 7.dp)
+        Spacer(Modifier.width(9.dp))
+        Text(text, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 private fun ToolCard(line: Line.Tool) {
     val shape = RoundedCornerShape(11.dp)
     val hasDiff = !line.diff.isNullOrBlank()
     var expanded by remember(line.key) { mutableStateOf(true) }
     Column(
         Modifier.fillMaxWidth().clip(shape).border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .background(MaterialTheme.colorScheme.surface).padding(11.dp),
+            .background(MaterialTheme.colorScheme.surface)
+            .then(if (line.status == ToolStatus.Running) Modifier.shimmer() else Modifier)
+            .padding(11.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

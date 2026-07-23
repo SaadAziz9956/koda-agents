@@ -91,6 +91,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     var working by mutableStateOf(false); private set
     var streaming by mutableStateOf(""); private set
     var reasoning by mutableStateOf(""); private set
+    /** Human label of what the agent is doing right now (Thinking…, Running…, Writing …). */
+    var activity by mutableStateOf<String?>(null); private set
 
     val lines = mutableStateListOf<Line>()
     val sessions = mutableStateListOf<SessionSummary>()
@@ -157,6 +159,19 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
         reasoning = ""
     }
 
+    private fun activityFor(tool: String, argsJson: String): String {
+        val file = Regex("\"file_path\"\\s*:\\s*\"([^\"]+)\"").find(argsJson)?.groupValues?.get(1)?.substringAfterLast('/')
+        return when (tool) {
+            "write", "edit" -> "Writing ${file ?: "file"}"
+            "read" -> "Reading ${file ?: "file"}"
+            "bash" -> "Running command"
+            "grep", "glob" -> "Searching files"
+            "web_search", "web_fetch" -> "Searching the web"
+            "delegate" -> "Delegating to a subagent"
+            else -> "Running $tool"
+        }
+    }
+
     init {
         client.onStatus = { s ->
             status = s
@@ -171,15 +186,16 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     is SessionStarted -> if (ev.sessionId == sessionId) {
                         modelName = ev.model; providerName = ev.provider; contextLength = ev.contextLength
                     }
-                    is TurnStarted -> if (ev.sessionId == sessionId) clearStream()
-                    is ReasoningDelta -> if (ev.sessionId == sessionId) onReason(ev.text)
-                    is TextDelta -> if (ev.sessionId == sessionId) onDelta(ev.text)
+                    is TurnStarted -> if (ev.sessionId == sessionId) { clearStream(); activity = "Thinking…" }
+                    is ReasoningDelta -> if (ev.sessionId == sessionId) { onReason(ev.text); activity = "Thinking…" }
+                    is TextDelta -> if (ev.sessionId == sessionId) { onDelta(ev.text); activity = "Responding…" }
                     is AssistantMessage -> {
                         if (ev.text.isNotBlank()) add { Line.Assistant(it, ev.text) }
-                        clearStream()
+                        clearStream(); activity = "Thinking…"
                     }
                     is ToolBegin -> {
                         clearStream()
+                        activity = activityFor(ev.toolName, ev.argsJson)
                         add { Line.Tool(it, ev.toolName, ev.argsJson.take(140), ToolStatus.Running) }
                     }
                     is ToolEnd -> {
@@ -189,6 +205,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         val st = if (ev.isError) ToolStatus.Error else ToolStatus.Ok
                         if (idx >= 0) lines[idx] = (lines[idx] as Line.Tool).copy(detail = detail.ifBlank { "done" }, status = st, diff = ev.diff)
                         else add { Line.Tool(it, ev.toolName, detail, st, ev.diff) }
+                        activity = "Thinking…"
                     }
                     is ApprovalRequest -> if (ev.sessionId == sessionId) pendingApproval = ev
                     is TokenUsage -> if (ev.sessionId == sessionId) usedTokens = ev.inputTokens
@@ -217,7 +234,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         add { Line.Note(it, "— resumed $sessionId (${ev.messages.size} messages) —") }
                     }
                     is TurnCompleted -> if (ev.sessionId == sessionId) {
-                        working = false; clearStream(); refreshCheckpoints()
+                        working = false; activity = null; clearStream(); refreshCheckpoints()
                     }
                     else -> {}
                 }
