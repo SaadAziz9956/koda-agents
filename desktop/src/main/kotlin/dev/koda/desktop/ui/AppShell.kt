@@ -187,11 +187,16 @@ private fun StreamingLine(text: String) {
 @Composable
 private fun ToolCard(line: Line.Tool) {
     val shape = RoundedCornerShape(11.dp)
+    val hasDiff = !line.diff.isNullOrBlank()
+    var expanded by remember(line.key) { mutableStateOf(true) }
     Column(
         Modifier.fillMaxWidth().clip(shape).border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .background(MaterialTheme.colorScheme.surface).padding(11.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = if (hasDiff) Modifier.fillMaxWidth().clickable { expanded = !expanded } else Modifier.fillMaxWidth(),
+        ) {
             val (glyph, color) = when (line.status) {
                 ToolStatus.Running -> "◐" to MaterialTheme.colorScheme.primary
                 ToolStatus.Ok -> "✓" to Ember.ok
@@ -201,7 +206,21 @@ private fun ToolCard(line: Line.Tool) {
             Spacer(Modifier.width(9.dp))
             Text(line.name, fontFamily = Ember.mono, fontWeight = FontWeight.Bold, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.width(9.dp))
-            Text(line.detail, fontFamily = Ember.mono, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(line.detail, fontFamily = Ember.mono, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.weight(1f))
+            if (hasDiff) {
+                val adds = line.diff!!.lines().count { it.startsWith("+") && !it.startsWith("+++") }
+                val dels = line.diff.lines().count { it.startsWith("-") && !it.startsWith("---") }
+                Spacer(Modifier.width(8.dp))
+                Text("+$adds", color = Ember.ok, fontFamily = Ember.mono, fontSize = 11.sp)
+                Spacer(Modifier.width(5.dp))
+                Text("−$dels", color = MaterialTheme.colorScheme.error, fontFamily = Ember.mono, fontSize = 11.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(if (expanded) "▾" else "▸", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
+        if (hasDiff && expanded) {
+            Spacer(Modifier.size(8.dp))
+            DiffView(line.diff!!)
         }
     }
 }

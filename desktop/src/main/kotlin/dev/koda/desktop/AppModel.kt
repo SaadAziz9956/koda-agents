@@ -43,7 +43,7 @@ sealed interface Line {
     val key: Int
     data class User(override val key: Int, val text: String) : Line
     data class Assistant(override val key: Int, val text: String) : Line
-    data class Tool(override val key: Int, val name: String, val detail: String, val status: ToolStatus) : Line
+    data class Tool(override val key: Int, val name: String, val detail: String, val status: ToolStatus, val diff: String? = null) : Line
     data class Note(override val key: Int, val text: String, val error: Boolean = false) : Line
 }
 
@@ -147,8 +147,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         val idx = lines.indexOfLast { it is Line.Tool && it.name == ev.toolName && it.status == ToolStatus.Running }
                         val detail = ev.output.lineSequence().firstOrNull()?.take(120) ?: ""
                         val st = if (ev.isError) ToolStatus.Error else ToolStatus.Ok
-                        if (idx >= 0) lines[idx] = (lines[idx] as Line.Tool).copy(detail = detail.ifBlank { "done" }, status = st)
-                        else add { Line.Tool(it, ev.toolName, detail, st) }
+                        if (idx >= 0) lines[idx] = (lines[idx] as Line.Tool).copy(detail = detail.ifBlank { "done" }, status = st, diff = ev.diff)
+                        else add { Line.Tool(it, ev.toolName, detail, st, ev.diff) }
                     }
                     is ApprovalRequest -> if (ev.sessionId == sessionId) pendingApproval = ev
                     is TokenUsage -> if (ev.sessionId == sessionId) usedTokens = ev.inputTokens
