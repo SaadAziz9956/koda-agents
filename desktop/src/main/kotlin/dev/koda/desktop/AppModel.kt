@@ -97,6 +97,12 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     var reasoning by mutableStateOf(""); private set
     /** Human label of what the agent is doing right now (Thinking…, Running…, Writing …). */
     var activity by mutableStateOf<String?>(null); private set
+    // Live turn telemetry, shown on the activity line.
+    var turnStartMs by mutableStateOf(0L); private set
+    var thoughtMs by mutableStateOf(0L); private set
+    var turnOutChars by mutableStateOf(0); private set
+    private var reasoningStartMs = 0L
+    private var firstTextSeen = false
 
     val lines = mutableStateListOf<Line>()
     val sessions = mutableStateListOf<SessionSummary>()
@@ -194,9 +200,20 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     is SessionStarted -> if (ev.sessionId == sessionId) {
                         modelName = ev.model; providerName = ev.provider; contextLength = ev.contextLength
                     }
-                    is TurnStarted -> if (ev.sessionId == sessionId) { clearStream(); activity = "Thinking…" }
-                    is ReasoningDelta -> if (ev.sessionId == sessionId) { onReason(ev.text); activity = "Thinking…" }
-                    is TextDelta -> if (ev.sessionId == sessionId) { onDelta(ev.text); activity = "Responding…" }
+                    is TurnStarted -> if (ev.sessionId == sessionId) {
+                        clearStream(); activity = "Thinking…"
+                        turnStartMs = System.currentTimeMillis(); thoughtMs = 0; turnOutChars = 0
+                        reasoningStartMs = 0; firstTextSeen = false
+                    }
+                    is ReasoningDelta -> if (ev.sessionId == sessionId) {
+                        onReason(ev.text); activity = "Thinking…"
+                        if (reasoningStartMs == 0L) reasoningStartMs = System.currentTimeMillis()
+                    }
+                    is TextDelta -> if (ev.sessionId == sessionId) {
+                        onDelta(ev.text); activity = "Responding…"
+                        if (!firstTextSeen) { firstTextSeen = true; if (reasoningStartMs > 0L) thoughtMs = System.currentTimeMillis() - reasoningStartMs }
+                        turnOutChars += ev.text.length
+                    }
                     is AssistantMessage -> {
                         if (ev.text.isNotBlank()) add { Line.Assistant(it, ev.text) }
                         clearStream(); activity = "Thinking…"

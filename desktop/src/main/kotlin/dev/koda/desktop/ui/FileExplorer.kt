@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,22 +57,44 @@ private fun renderNodes(scope: androidx.compose.foundation.lazy.LazyListScope, m
     }
 }
 
+private fun typeColor(name: String): Color = when (name.substringAfterLast('.', "").lowercase()) {
+    "kt", "kts" -> Color(0xFFA97BFF)
+    "py" -> Color(0xFF4B8BBE)
+    "js", "ts", "jsx", "tsx" -> Color(0xFFE7C650)
+    "json", "yaml", "yml", "toml" -> Color(0xFF8FA6B2)
+    "md", "txt" -> Color(0xFF7FB069)
+    "gradle" -> Color(0xFF6CB6A8)
+    "png", "jpg", "jpeg", "svg", "gif" -> Color(0xFFD08FD0)
+    else -> Color(0xFF8A817A)
+}
+
 @Composable
 private fun TreeRow(model: AppModel, entry: DirEntry, depth: Int) {
     val open = model.expandedDirs.contains(entry.path)
     val isCurrent = model.openFilePath == entry.path
+    val guide = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     Row(
-        Modifier.fillMaxWidth()
-            .background(if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else androidx.compose.ui.graphics.Color.Transparent)
+        Modifier.fillMaxWidth().height(25.dp)
+            .background(if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
             .clickable { if (entry.isDir) model.toggleDir(entry.path) else model.openFile(entry.path) }
-            .padding(start = (8 + depth * 13).dp, top = 3.dp, bottom = 3.dp, end = 8.dp),
+            .padding(end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            if (entry.isDir) (if (open) "▾" else "▸") else " ",
-            fontFamily = Ember.mono, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(14.dp),
-        )
+        // Indent guides, one thin vertical rule per ancestor level.
+        repeat(depth) {
+            Box(Modifier.width(14.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                Box(Modifier.width(1.dp).fillMaxHeight().background(guide))
+            }
+        }
+        Spacer(Modifier.width(6.dp))
+        Box(Modifier.width(16.dp), contentAlignment = Alignment.Center) {
+            if (entry.isDir) {
+                Text(if (open) "▾" else "▸", fontFamily = Ember.mono, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(typeColor(entry.name)))
+            }
+        }
+        Spacer(Modifier.width(5.dp))
         Text(
             entry.name,
             fontFamily = Ember.mono, fontSize = 12.5f.sp,

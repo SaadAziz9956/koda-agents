@@ -185,7 +185,7 @@ private fun Transcript(model: AppModel) {
         if (model.reasoning.isNotBlank()) item(key = -3) { ReasoningBlock(model.reasoning) }
         if (model.streaming.isNotBlank()) item(key = -1) { StreamingLine(model.streaming) }
         if (model.working && model.streaming.isBlank() && model.reasoning.isBlank()) {
-            item(key = -4) { ActivityLine(model.activity ?: "Working…") }
+            item(key = -4) { ActivityLine(model, model.activity ?: "Working…") }
         }
         model.pendingApproval?.let { req -> item(key = -2) { ApprovalCard(req.summary) { model.approve(it) } } }
         model.pendingClarify?.let { c -> item(key = -5) { ClarifyCard(c, model) } }
@@ -242,11 +242,26 @@ private fun StreamingLine(text: String) {
 }
 
 @Composable
-private fun ActivityLine(text: String) {
+private fun ActivityLine(model: AppModel, text: String) {
+    var elapsed by remember { mutableStateOf(0L) }
+    LaunchedEffect(model.turnStartMs) {
+        while (model.working && model.turnStartMs > 0) {
+            elapsed = System.currentTimeMillis() - model.turnStartMs
+            kotlinx.coroutines.delay(500)
+        }
+    }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().shimmer()) {
         Dot(MaterialTheme.colorScheme.primary, 7.dp)
         Spacer(Modifier.width(9.dp))
         Text(text, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(10.dp))
+        val tokens = model.turnOutChars / 4
+        val meta = buildString {
+            append("${elapsed / 1000}s")
+            if (tokens > 0) append("  ·  ↓${tokens} tok")
+            if (model.thoughtMs > 0) append("  ·  thought ${model.thoughtMs / 1000}s")
+        }
+        Text(meta, fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
     }
 }
 
