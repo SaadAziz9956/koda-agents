@@ -21,7 +21,9 @@ import dev.koda.protocol.GitStatus
 import dev.koda.protocol.CancelSchedule
 import dev.koda.protocol.CreateSchedule
 import dev.koda.protocol.ListDir
+import dev.koda.protocol.ListModels
 import dev.koda.protocol.ListSchedules
+import dev.koda.protocol.ModelList
 import dev.koda.protocol.PrResult
 import dev.koda.protocol.ReviewRequest
 import dev.koda.protocol.ScheduleInfo
@@ -116,6 +118,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     var gitDiffPath by mutableStateOf<String?>(null); private set
 
     val schedules = mutableStateListOf<ScheduleInfo>()
+    val availableModels = mutableStateListOf<String>()
+    var activeModel by mutableStateOf(""); private set
 
     val contextPercent: Int?
         get() = if (contextLength > 0 && usedTokens > 0) ((usedTokens * 100) / contextLength).toInt().coerceAtMost(100) else null
@@ -178,6 +182,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             if (s == ConnStatus.Connected && !everConnected) {
                 everConnected = true
                 refreshSessions(); refreshCheckpoints(); loadDir(""); refreshGit(); refreshSchedules()
+                scope.launch { client.submit(ListModels(id(), sessionId)) }
             }
         }
         scope.launch {
@@ -221,6 +226,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     }
                     is GitDiff -> { gitDiff = ev.unified; gitDiffPath = ev.path }
                     is ScheduleList -> { schedules.clear(); schedules.addAll(ev.schedules) }
+                    is ModelList -> { availableModels.clear(); availableModels.addAll(ev.models); activeModel = ev.current }
                     is GitCommitResult -> { add { Line.Note(it, "git: ${ev.message}", error = !ev.ok) }; refreshGit() }
                     is PrResult -> add { Line.Note(it, "PR: ${ev.message}", error = !ev.ok) }
                     is CheckpointList -> if (ev.sessionId == sessionId) { checkpoints.clear(); checkpoints.addAll(ev.checkpoints) }
@@ -258,7 +264,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     }
 
     fun setModelId(modelId: String) {
-        if (modelId.isNotBlank()) scope.launch { client.submit(SetModel(id(), sessionId, modelId)) }
+        if (modelId.isNotBlank()) { activeModel = modelId; scope.launch { client.submit(SetModel(id(), sessionId, modelId)) } }
     }
 
     fun approve(decision: ApprovalDecision) {

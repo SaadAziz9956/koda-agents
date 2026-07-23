@@ -215,6 +215,14 @@ data class Rewind(
     val steps: Int = 1,
 ) : Submission
 
+/** Ask the core which models the active provider offers. Answered with [ModelList]. */
+@Serializable
+@SerialName("list_models")
+data class ListModels(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
 /** Switch the model for a session at runtime. Acked with a [Notice]. */
 @Serializable
 @SerialName("set_model")
@@ -321,6 +329,15 @@ data class SessionHistory(
 
 @Serializable
 data class HistoryMessage(val role: String, val text: String)
+
+/** Answer to [ListModels]: model ids the active provider offers, and the current one. */
+@Serializable
+@SerialName("model_list")
+data class ModelList(
+    override val sessionId: String,
+    val models: List<String>,
+    val current: String,
+) : Event
 
 /** Answer to [ListCheckpoints]: undo points, newest first (index 1 = most recent turn). */
 @Serializable

@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,7 +63,7 @@ fun AppShell(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: () -> U
             if (model.status != ConnStatus.Connected) ReconnectBanner(model)
             Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
             HDivider()
-            Composer(model)
+            Composer(model, onOpenSettings)
         }
         // The coding workspace (Files/Git/Rewind) only shows in Code view.
         if (view == AppView.Code) {
@@ -308,17 +310,67 @@ private fun ApprovalCard(summary: String, onDecide: (ApprovalDecision) -> Unit) 
     }
 }
 
+private val SLASH_CMDS = listOf(
+    "new" to "start a fresh session",
+    "review" to "review uncommitted changes",
+    "plan" to "toggle plan mode",
+    "rewind" to "undo the last turn",
+    "compact" to "compress history",
+    "settings" to "open settings",
+)
+
 @Composable
-private fun Composer(model: AppModel) {
+private fun Composer(model: AppModel, onOpenSettings: () -> Unit) {
     var input by remember { mutableStateOf("") }
     val attachments = remember { mutableStateListOf<String>() }
-    fun submit() { model.send(input, attachments.toList()); input = ""; attachments.clear() }
+    fun runSlash(name: String) {
+        when (name) {
+            "new" -> model.newSession()
+            "review" -> model.review("uncommitted")
+            "plan" -> model.changeMode(if (model.mode == PermissionModeSetting.PLAN) PermissionModeSetting.DEFAULT else PermissionModeSetting.PLAN)
+            "rewind" -> model.rewind(1)
+            "compact" -> model.compact()
+            "settings" -> onOpenSettings()
+        }
+    }
+    fun submit() {
+        val t = input.trim()
+        if (t.startsWith("/")) {
+            val name = t.drop(1).substringBefore(' ').lowercase()
+            if (SLASH_CMDS.any { it.first == name }) { runSlash(name); input = ""; return }
+        }
+        model.send(input, attachments.toList()); input = ""; attachments.clear()
+    }
+    val slashQuery = if (input.startsWith("/") && !input.contains(' ')) input.drop(1).lowercase() else null
+    val matches = if (slashQuery != null) SLASH_CMDS.filter { it.first.startsWith(slashQuery) } else emptyList()
     val shape = RoundedCornerShape(14.dp)
+
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+        // Slash-command autocomplete, above the input.
+        if (matches.isNotEmpty()) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(11.dp)).padding(4.dp),
+            ) {
+                matches.forEach { (name, desc) ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { runSlash(name); input = "" }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("/$name", fontFamily = Ember.mono, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(90.dp))
+                        Text(desc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.size(6.dp))
+        }
+
+        // Clean input box — writing only.
         Column(
             Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, MaterialTheme.colorScheme.outline, shape).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (attachments.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -337,17 +389,18 @@ private fun Composer(model: AppModel) {
                 placeholder = "Message Koda…    / for commands",
                 modifier = Modifier.fillMaxWidth(), bordered = false, onSubmit = ::submit,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ModeChip(model)
-                Spacer(Modifier.width(8.dp))
-                AttachButton { attachments.add(it) }
-                Spacer(Modifier.weight(1f))
-                if (model.working) {
-                    EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
-                    Spacer(Modifier.width(8.dp))
-                }
-                EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
+        }
+        Spacer(Modifier.size(8.dp))
+        // Controls toolbar — below the input, out of the way.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModeMenu(model)
+            ModelMenu(model)
+            AttachButton { attachments.add(it) }
+            Spacer(Modifier.weight(1f))
+            if (model.working) {
+                EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
             }
+            EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
         }
     }
 }
@@ -369,23 +422,59 @@ private fun AttachButton(onPick: (String) -> Unit) {
 }
 
 @Composable
-private fun ModeChip(model: AppModel) {
-    val next = when (model.mode) {
-        PermissionModeSetting.DEFAULT -> PermissionModeSetting.ACCEPT_EDITS
-        PermissionModeSetting.ACCEPT_EDITS -> PermissionModeSetting.YOLO
-        PermissionModeSetting.YOLO -> PermissionModeSetting.PLAN
-        PermissionModeSetting.PLAN -> PermissionModeSetting.DEFAULT
-    }
+private fun ModeMenu(model: AppModel) {
+    var open by remember { mutableStateOf(false) }
     val label = when (model.mode) {
         PermissionModeSetting.DEFAULT -> "default"
         PermissionModeSetting.ACCEPT_EDITS -> "accept-edits"
         PermissionModeSetting.YOLO -> "yolo"
         PermissionModeSetting.PLAN -> "plan"
     }
-    Box(
-        Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.primary, ChipShape)
-            .clickable { model.changeMode(next) }.padding(horizontal = 10.dp, vertical = 9.dp),
-    ) {
-        Text(label, fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.primary)
+    Box {
+        Row(
+            Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.primary, ChipShape)
+                .clickable { open = true }.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.primary)
+            Text(" ▾", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(
+                PermissionModeSetting.DEFAULT to "default",
+                PermissionModeSetting.ACCEPT_EDITS to "accept-edits",
+                PermissionModeSetting.YOLO to "yolo",
+                PermissionModeSetting.PLAN to "plan",
+            ).forEach { (m, l) ->
+                DropdownMenuItem(text = { Text(l, fontFamily = Ember.mono, fontSize = 12.5f.sp) }, onClick = { model.changeMode(m); open = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelMenu(model: AppModel) {
+    var open by remember { mutableStateOf(false) }
+    val label = model.activeModel.ifBlank { model.modelName.ifBlank { "model" } }
+    Box {
+        Row(
+            Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.outline, ChipShape)
+                .clickable { open = true }.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(" ▾", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (model.availableModels.isEmpty()) {
+                DropdownMenuItem(text = { Text("(no models)") }, onClick = { open = false })
+            }
+            model.availableModels.forEach { id ->
+                DropdownMenuItem(
+                    text = { Text(id, fontFamily = Ember.mono, fontSize = 12.5f.sp, color = if (id == model.activeModel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                    onClick = { model.setModelId(id); open = false },
+                )
+            }
+        }
     }
 }

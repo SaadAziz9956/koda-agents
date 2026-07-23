@@ -272,6 +272,14 @@ class KodaCore(
                         )
                     }
                 }
+                is dev.koda.protocol.ListModels -> {
+                    val models = when (config.provider.apiShape) {
+                        ApiShape.ANTHROPIC_MESSAGES -> ANTHROPIC_CATALOG.map { it.id }
+                        ApiShape.OPENAI_CHAT_COMPLETIONS -> listOf(config.model)
+                    }
+                    val current = sessions[submission.sessionId]?.session?.modelOverride?.id ?: config.model
+                    _events.emit(dev.koda.protocol.ModelList(submission.sessionId, models, current))
+                }
                 is dev.koda.protocol.SetModel -> {
                     val resolved = resolveModel(submission.modelId)
                     if (resolved == null) {
