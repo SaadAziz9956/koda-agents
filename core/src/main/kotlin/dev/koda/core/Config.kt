@@ -11,6 +11,10 @@ enum class PermissionMode {
 
     /** Nothing asks. The user opted out of the gate entirely. */
     YOLO,
+
+    /** Read-only exploration: mutating tools are blocked so the agent proposes
+     *  a plan; the user switches out of PLAN to let it execute. */
+    PLAN,
 }
 
 /** Which vendor API shape the provider speaks. Koog client selection keys off this. */

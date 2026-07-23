@@ -87,6 +87,13 @@ class ToolGate(
             PreToolDecision.Proceed -> {}
         }
 
+        // Plan mode: refuse mutations so the agent proposes a plan instead of acting.
+        if (mutating && session.permissions.blocksMutations()) {
+            return "PLAN MODE: do not modify files or run mutating commands yet. " +
+                "Present a concise, numbered plan of what you intend to do, then stop and " +
+                "wait for the user to approve it (they will switch out of plan mode)."
+        }
+
         // A dangerous shell command forces approval regardless of mode (guardrail).
         val danger = if (toolName == "bash") {
             DangerousCommands.match(effectiveArgs["command"]?.jsonPrimitive?.contentOrNull ?: "")

@@ -67,6 +67,15 @@ object GitService {
         return run(cwd, *args.toTypedArray()).second
     }
 
+    /** The diff to review for a [target]: uncommitted / staged / a ref / a range. */
+    fun reviewDiff(cwd: Path, target: String): String = when {
+        target.isBlank() || target == "uncommitted" -> run(cwd, "diff", "--no-color", "HEAD").second
+        target == "staged" -> run(cwd, "diff", "--no-color", "--staged").second
+        target.contains("..") -> run(cwd, "diff", "--no-color", target).second
+        else -> run(cwd, "show", "--no-color", target).second
+            .ifBlank { run(cwd, "diff", "--no-color", "$target...HEAD").second }
+    }
+
     fun commit(cwd: Path, message: String): Pair<Boolean, String> {
         val add = run(cwd, "add", "-A")
         if (add.first != 0) return false to add.second.trim().ifBlank { "git add failed" }

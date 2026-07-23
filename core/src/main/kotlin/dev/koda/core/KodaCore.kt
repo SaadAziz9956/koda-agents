@@ -171,6 +171,26 @@ class KodaCore(
                         )
                     )
                 }
+                is dev.koda.protocol.ReviewRequest -> {
+                    val diff = GitService.reviewDiff(config.cwd, submission.target)
+                    if (diff.isBlank()) {
+                        _events.emit(Notice(submission.sessionId, "review: no changes found for '${submission.target}'"))
+                    } else {
+                        val capped = if (diff.length > 60_000) diff.take(60_000) + "\n… (diff truncated)" else diff
+                        val prompt = """
+                            Review the following code changes (target: ${submission.target}). Act as a
+                            careful senior reviewer. Do NOT modify any files — this is review only.
+                            Report prioritized findings (most severe first): correctness/bugs, security,
+                            performance, and clarity. For each: the file, what's wrong, and the fix.
+                            If it looks good, say so briefly.
+
+                            ```diff
+                            $capped
+                            ```
+                        """.trimIndent()
+                        runtimeFor(submission.sessionId).enqueue(SessionWork.Turn(prompt))
+                    }
+                }
                 is dev.koda.protocol.ListDir -> {
                     val listed = WorkspaceService.list(config.cwd, submission.path)
                     if (listed == null) {
@@ -239,6 +259,7 @@ class KodaCore(
                             PermissionModeSetting.DEFAULT -> PermissionMode.DEFAULT
                             PermissionModeSetting.ACCEPT_EDITS -> PermissionMode.ACCEPT_EDITS
                             PermissionModeSetting.YOLO -> PermissionMode.YOLO
+                            PermissionModeSetting.PLAN -> PermissionMode.PLAN
                         }
                     )
             }

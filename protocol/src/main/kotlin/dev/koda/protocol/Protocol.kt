@@ -151,6 +151,19 @@ data class GetFile(
 ) : Submission
 
 /**
+ * Run a code review over a git target and stream findings as a normal turn.
+ * [target]: "uncommitted" (default), "staged", a commit ref, or a "base..head"
+ * / branch range.
+ */
+@Serializable
+@SerialName("review_request")
+data class ReviewRequest(
+    override val id: String,
+    override val sessionId: String,
+    val target: String = "uncommitted",
+) : Submission
+
+/**
  * Undo the last [steps] turns: restore the conversation to before them and
  * revert files those turns changed via the write/edit tools. Answered with
  * [RewindResult].
@@ -177,6 +190,7 @@ enum class PermissionModeSetting {
     @SerialName("default") DEFAULT,
     @SerialName("accept_edits") ACCEPT_EDITS,
     @SerialName("yolo") YOLO,
+    @SerialName("plan") PLAN,
 }
 
 @Serializable

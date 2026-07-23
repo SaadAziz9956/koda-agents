@@ -150,6 +150,18 @@ val COMMANDS: List<CliCommand> = listOf(
         }
     },
 
+    CliCommand("plan", "/plan", "Toggle plan mode (explore & propose, don't act)") { ctx, _ ->
+        val newMode = if (ctx.state.mode == PermissionMode.PLAN) PermissionMode.DEFAULT else PermissionMode.PLAN
+        ctx.state.mode = newMode
+        ctx.core.submit(
+            SetPermissionMode(
+                UUID.randomUUID().toString(), ctx.state.sessionId,
+                if (newMode == PermissionMode.PLAN) PermissionModeSetting.PLAN else PermissionModeSetting.DEFAULT,
+            )
+        )
+        println("${DIM}permission mode: ${newMode.name.lowercase()}${RESET}")
+    },
+
     CliCommand("yolo", "/yolo", "Toggle approval-free mode for this session") { ctx, _ ->
         val newMode =
             if (ctx.state.mode == PermissionMode.YOLO) PermissionMode.DEFAULT else PermissionMode.YOLO
@@ -162,6 +174,7 @@ val COMMANDS: List<CliCommand> = listOf(
                     PermissionMode.DEFAULT -> PermissionModeSetting.DEFAULT
                     PermissionMode.ACCEPT_EDITS -> PermissionModeSetting.ACCEPT_EDITS
                     PermissionMode.YOLO -> PermissionModeSetting.YOLO
+                    PermissionMode.PLAN -> PermissionModeSetting.PLAN
                 },
             )
         )

@@ -16,6 +16,7 @@ class ModePermissionPolicy(initialMode: PermissionMode) : PermissionPolicy {
             PermissionMode.YOLO -> false
             PermissionMode.ACCEPT_EDITS -> toolName == "bash"
             PermissionMode.DEFAULT -> true
+            PermissionMode.PLAN -> true // moot: the gate blocks mutations first
         }
     }
 
@@ -26,4 +27,6 @@ class ModePermissionPolicy(initialMode: PermissionMode) : PermissionPolicy {
     override fun updateMode(mode: PermissionMode) {
         this.mode = mode
     }
+
+    override fun blocksMutations(): Boolean = mode == PermissionMode.PLAN
 }

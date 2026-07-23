@@ -13,4 +13,7 @@ interface PermissionPolicy {
 
     /** The user changed the session's permission mode at runtime. */
     fun updateMode(mode: PermissionMode)
+
+    /** Plan mode: mutating tools are blocked outright (agent proposes a plan). */
+    fun blocksMutations(): Boolean = false
 }

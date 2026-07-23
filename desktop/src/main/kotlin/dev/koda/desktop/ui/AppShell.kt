@@ -259,12 +259,14 @@ private fun ModeChip(model: AppModel) {
     val next = when (model.mode) {
         PermissionModeSetting.DEFAULT -> PermissionModeSetting.ACCEPT_EDITS
         PermissionModeSetting.ACCEPT_EDITS -> PermissionModeSetting.YOLO
-        PermissionModeSetting.YOLO -> PermissionModeSetting.DEFAULT
+        PermissionModeSetting.YOLO -> PermissionModeSetting.PLAN
+        PermissionModeSetting.PLAN -> PermissionModeSetting.DEFAULT
     }
     val label = when (model.mode) {
         PermissionModeSetting.DEFAULT -> "default"
         PermissionModeSetting.ACCEPT_EDITS -> "accept-edits"
         PermissionModeSetting.YOLO -> "yolo"
+        PermissionModeSetting.PLAN -> "plan"
     }
     Box(
         Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.primary, ChipShape)

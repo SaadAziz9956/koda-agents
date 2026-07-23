@@ -224,6 +224,7 @@ private fun KodaApp(
                     PermissionMode.YOLO -> PermissionModeSetting.YOLO
                     PermissionMode.ACCEPT_EDITS -> PermissionModeSetting.ACCEPT_EDITS
                     PermissionMode.DEFAULT -> PermissionModeSetting.DEFAULT
+                    PermissionMode.PLAN -> PermissionModeSetting.PLAN
                 }
                 scope.launch { core.submit(SetPermissionMode(id(), sessionId, setting)) }
                 add(Item.Note(seq, "permission mode: ${mode.name.lowercase()}", KodaColors.dim))
