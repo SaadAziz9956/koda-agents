@@ -129,7 +129,7 @@ class KodaCore(
         scheduler.loadAndStart()
         for (submission in submissions) {
             when (submission) {
-                is UserTurn -> runtimeFor(submission.sessionId).enqueue(SessionWork.Turn(submission.text))
+                is UserTurn -> runtimeFor(submission.sessionId).enqueue(SessionWork.Turn(submission.text, submission.attachments))
                 is CompactSession -> runtimeFor(submission.sessionId).enqueue(SessionWork.Compact)
                 is Interrupt -> sessions[submission.sessionId]?.interrupt()
                 is ApprovalResponse ->
@@ -272,6 +272,15 @@ class KodaCore(
                         )
                     }
                 }
+                is dev.koda.protocol.SetModel -> {
+                    val resolved = resolveModel(submission.modelId)
+                    if (resolved == null) {
+                        _events.emit(Notice(submission.sessionId, "unknown model '${submission.modelId}' for this provider"))
+                    } else {
+                        runtimeFor(submission.sessionId).session.modelOverride = resolved
+                        _events.emit(Notice(submission.sessionId, "model → ${submission.modelId}"))
+                    }
+                }
                 is SetPermissionMode ->
                     runtimeFor(submission.sessionId).session.permissions.updateMode(
                         when (submission.mode) {
@@ -286,6 +295,21 @@ class KodaCore(
     }
 
     suspend fun submit(submission: Submission) = submissions.send(submission)
+
+    /** Resolve a model id for the active provider; null if unknown (Anthropic is catalog-bound). */
+    private fun resolveModel(id: String): LLModel? = when (config.provider.apiShape) {
+        ApiShape.ANTHROPIC_MESSAGES -> ANTHROPIC_CATALOG.firstOrNull { it.id == id }
+        ApiShape.OPENAI_CHAT_COMPLETIONS -> LLModel(
+            provider = LLMProvider.OpenAI,
+            id = id,
+            capabilities = listOf(
+                LLMCapability.Completion, LLMCapability.Tools, LLMCapability.ToolChoice,
+                LLMCapability.Temperature, LLMCapability.OpenAIEndpoint.Completions,
+            ),
+            contextLength = 200_000,
+            maxOutputTokens = config.maxTokens.toLong(),
+        )
+    }
 
     /** Connect configured MCP servers before processing any submissions. */
     private suspend fun connectMcpServers() {
@@ -337,7 +361,7 @@ class KodaCore(
     }
 
     private sealed interface SessionWork {
-        data class Turn(val text: String) : SessionWork
+        data class Turn(val text: String, val attachments: List<String> = emptyList()) : SessionWork
         data object Compact : SessionWork
     }
 
@@ -402,7 +426,7 @@ class KodaCore(
                             is SessionWork.Turn -> {
                                 // Open an undo checkpoint over the committed pre-turn state.
                                 checkpoints[session.id]?.begin(session.prompt, work.text)
-                                engine.runTurn(session, registry, work.text)
+                                engine.runTurn(session, registry, work.text, work.attachments)
                             }
                             is SessionWork.Compact -> engine.compact(session, registry)
                         }

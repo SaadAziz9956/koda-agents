@@ -26,6 +26,10 @@ class AgentSession(
     @Volatile
     var currentTurnId: String = ""
 
+    /** Runtime model override for this session (see SetModel); null = the core default. */
+    @Volatile
+    var modelOverride: ai.koog.prompt.llm.LLModel? = null
+
     fun persist() {
         prompt?.let { repository.save(id, it) }
     }

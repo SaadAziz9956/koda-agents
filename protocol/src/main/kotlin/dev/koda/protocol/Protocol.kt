@@ -35,6 +35,8 @@ data class UserTurn(
     override val id: String,
     override val sessionId: String,
     val text: String,
+    /** Image attachments: local file paths, http(s) URLs, or data: URIs. */
+    val attachments: List<String> = emptyList(),
 ) : Submission
 
 /** Cancel the currently running turn, keeping the session alive. */
@@ -211,6 +213,15 @@ data class Rewind(
     override val id: String,
     override val sessionId: String,
     val steps: Int = 1,
+) : Submission
+
+/** Switch the model for a session at runtime. Acked with a [Notice]. */
+@Serializable
+@SerialName("set_model")
+data class SetModel(
+    override val id: String,
+    override val sessionId: String,
+    val modelId: String,
 ) : Submission
 
 /** Change the permission mode of a running session. */

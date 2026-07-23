@@ -47,7 +47,12 @@ class KoogEngine(
     /** Fired (non-blocking) after a successful turn with (sessionId, userInput, assistantText). */
     private val onTurnCompleted: (suspend (String, String, String) -> Unit)? = null,
 ) {
-    suspend fun runTurn(session: AgentSession, registry: ToolRegistry, text: String) {
+    suspend fun runTurn(
+        session: AgentSession,
+        registry: ToolRegistry,
+        text: String,
+        attachments: List<String> = emptyList(),
+    ) {
         val turnId = UUID.randomUUID().toString()
         session.currentTurnId = turnId
         events.emit(TurnStarted(session.id, turnId))
@@ -63,7 +68,19 @@ class KoogEngine(
                 restoreConversation(session)
                 autoCompactIfNeeded(session)
 
-                var response = streamIteration(session, turnId) { user(input) }
+                var response = streamIteration(session, turnId) {
+                    if (attachments.isEmpty()) {
+                        user(input)
+                    } else {
+                        user {
+                            attachments.forEach { a ->
+                                if (a.startsWith("data:") || a.startsWith("http://") || a.startsWith("https://")) image(a)
+                                else image(kotlinx.io.files.Path(session.toolContext.cwd.resolve(a).toString()))
+                            }
+                            text(input)
+                        }
+                    }
+                }
                 emitIterationEnd(session, turnId, response)
 
                 var iterations = 0
@@ -140,7 +157,7 @@ class KoogEngine(
         strategy: ai.koog.agents.core.agent.AIAgentFunctionalStrategy<String, String>,
     ) = AIAgent(
         promptExecutor = executor,
-        llmModel = model,
+        llmModel = session.modelOverride ?: model,
         strategy = strategy,
         toolRegistry = registry,
         systemPrompt = session.systemPrompt,
