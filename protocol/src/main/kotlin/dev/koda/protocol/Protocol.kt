@@ -47,6 +47,16 @@ data class Interrupt(
     override val sessionId: String,
 ) : Submission
 
+/** Answer to a pending [ClarifyRequest]. `answer` is an option label, free text, or the chat sentinel. */
+@Serializable
+@SerialName("clarify_response")
+data class ClarifyResponse(
+    override val id: String,
+    override val sessionId: String,
+    val clarifyId: String,
+    val answer: String,
+) : Submission
+
 /** Answer to a pending [ApprovalRequest]. */
 @Serializable
 @SerialName("approval_response")
@@ -510,6 +520,24 @@ data class ToolEnd(
  * The core is blocked waiting for the user to approve a tool call.
  * Answered with [ApprovalResponse].
  */
+/**
+ * The agent is asking the user to choose. Answered with [ClarifyResponse].
+ * The surface renders [options] (each label + description) plus a free-text
+ * ("type something") and a "chat about this" affordance.
+ */
+@Serializable
+@SerialName("clarify_request")
+data class ClarifyRequest(
+    override val sessionId: String,
+    val clarifyId: String,
+    val question: String,
+    val options: List<ClarifyOption>,
+) : Event
+
+@Serializable
+data class ClarifyOption(val label: String, val description: String = "")
+
+
 @Serializable
 @SerialName("approval_request")
 data class ApprovalRequest(

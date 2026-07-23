@@ -4,6 +4,7 @@ import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.serialization.TypeToken
 import ai.koog.serialization.typeToken
+import dev.koda.tools.AskTool
 import dev.koda.tools.BashTool
 import dev.koda.tools.EditTool
 import dev.koda.tools.GlobTool
@@ -22,6 +23,7 @@ import dev.koda.tools.WriteTool
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -168,6 +170,21 @@ class KoogWebSearchTool(gate: ToolGate) : GatedTool<WebSearchArgs>(typeToken<Web
     override fun toJson(args: WebSearchArgs): JsonObject = buildJsonObject { put("query", args.query) }
 }
 
+@Serializable
+data class AskOption(val label: String, val description: String = "")
+
+@Serializable
+data class AskArgs(val question: String, val options: List<AskOption> = emptyList())
+
+class KoogAskTool(gate: ToolGate) : GatedTool<AskArgs>(typeToken<AskArgs>(), AskTool(), gate) {
+    override fun toJson(args: AskArgs): JsonObject = buildJsonObject {
+        put("question", args.question)
+        putJsonArray("options") {
+            args.options.forEach { addJsonObject { put("label", it.label); put("description", it.description) } }
+        }
+    }
+}
+
 /** The default Koda toolset as a per-session Koog registry. */
 fun kodaToolRegistry(
     gate: ToolGate,
@@ -189,6 +206,7 @@ fun kodaToolRegistry(
             KoogSkillCreateTool(gate, skillWriter),
             KoogWebFetchTool(gate),
             KoogWebSearchTool(gate),
+            KoogAskTool(gate),
         )
     )
 }

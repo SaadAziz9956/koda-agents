@@ -17,6 +17,7 @@ class AgentSession(
     val toolContext: ToolContext,
     val permissions: PermissionPolicy,
     val approvals: ApprovalBroker,
+    val clarifications: ClarifyBroker = ClarifyBroker(),
     private val repository: SessionRepository,
 ) {
     /** Full conversation including system message; null until the first completed turn. */

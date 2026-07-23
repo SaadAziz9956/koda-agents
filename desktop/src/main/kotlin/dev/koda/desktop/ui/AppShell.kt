@@ -47,6 +47,7 @@ import dev.koda.desktop.Line
 import dev.koda.desktop.ToolStatus
 import dev.koda.desktop.theme.Ember
 import dev.koda.protocol.ApprovalDecision
+import dev.koda.protocol.ClarifyRequest
 import dev.koda.protocol.PermissionModeSetting
 
 enum class AppView { Home, Code }
@@ -187,6 +188,7 @@ private fun Transcript(model: AppModel) {
             item(key = -4) { ActivityLine(model.activity ?: "Working…") }
         }
         model.pendingApproval?.let { req -> item(key = -2) { ApprovalCard(req.summary) { model.approve(it) } } }
+        model.pendingClarify?.let { c -> item(key = -5) { ClarifyCard(c, model) } }
     }
 }
 
@@ -318,6 +320,51 @@ private val SLASH_CMDS = listOf(
     "compact" to "compress history",
     "settings" to "open settings",
 )
+
+@Composable
+private fun ClarifyCard(c: ClarifyRequest, model: AppModel) {
+    val shape = RoundedCornerShape(12.dp)
+    var typing by remember(c.clarifyId) { mutableStateOf(false) }
+    var custom by remember(c.clarifyId) { mutableStateOf("") }
+    Column(
+        Modifier.fillMaxWidth().clip(shape).border(1.dp, MaterialTheme.colorScheme.primary, shape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)).padding(15.dp),
+    ) {
+        Text("NEEDS INPUT", fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.size(8.dp))
+        Text(c.question, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.size(12.dp))
+        c.options.forEachIndexed { i, opt ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { model.answerClarify(opt.label) }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            ) {
+                Text("${i + 1}", fontFamily = Ember.mono, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(22.dp))
+                Column {
+                    Text(opt.label, fontSize = 13.5f.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                    if (opt.description.isNotBlank()) {
+                        Text(opt.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 17.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.size(6.dp)); HDivider(); Spacer(Modifier.size(6.dp))
+        if (!typing) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { typing = true }.padding(horizontal = 8.dp, vertical = 8.dp)) {
+                Text("✎  Type something else", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EmberField(custom, { custom = it }, "Your answer…", Modifier.weight(1f), onSubmit = { if (custom.isNotBlank()) model.answerClarify(custom) })
+                Spacer(Modifier.width(8.dp))
+                EmberButton("Send", onClick = { if (custom.isNotBlank()) model.answerClarify(custom) })
+            }
+        }
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { model.answerClarify("Let's talk this through instead of picking one of those options.") }.padding(horizontal = 8.dp, vertical = 8.dp)) {
+            Text("💬  Chat about this", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
 @Composable
 private fun Composer(model: AppModel, onOpenSettings: () -> Unit) {

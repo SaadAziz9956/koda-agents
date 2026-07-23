@@ -51,6 +51,13 @@ fun main(): Unit = application {
                 model.pendingApproval != null && e.key == Key.Y -> { model.approve(ApprovalDecision.APPROVE); true }
                 model.pendingApproval != null && e.key == Key.A -> { model.approve(ApprovalDecision.APPROVE_ALWAYS); true }
                 model.pendingApproval != null && e.key == Key.N -> { model.approve(ApprovalDecision.DENY); true }
+                model.pendingClarify != null -> {
+                    val n = when (e.key) {
+                        Key.One -> 1; Key.Two -> 2; Key.Three -> 3; Key.Four -> 4; Key.Five -> 5; Key.Six -> 6; else -> 0
+                    }
+                    val opt = if (n > 0) model.pendingClarify?.options?.getOrNull(n - 1) else null
+                    if (opt != null) { model.answerClarify(opt.label); true } else false
+                }
                 else -> false
             }
         },

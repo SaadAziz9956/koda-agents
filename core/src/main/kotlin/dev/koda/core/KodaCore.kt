@@ -135,6 +135,9 @@ class KodaCore(
                 is ApprovalResponse ->
                     sessions[submission.sessionId]
                         ?.session?.approvals?.resolve(submission.approvalId, submission.decision)
+                is dev.koda.protocol.ClarifyResponse ->
+                    sessions[submission.sessionId]
+                        ?.session?.clarifications?.resolve(submission.clarifyId, submission.answer)
                 is ListSessions -> _events.emit(
                     SessionList(
                         submission.sessionId,
@@ -450,6 +453,7 @@ class KodaCore(
 
         fun interrupt() {
             session.approvals.cancelAll()
+            session.clarifications.cancelAll()
             currentWork?.cancel()
         }
     }

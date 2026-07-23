@@ -4,6 +4,8 @@ import dev.koda.core.AgentSession
 import dev.koda.core.ContextFiles
 import dev.koda.protocol.ApprovalDecision
 import dev.koda.protocol.ApprovalRequest
+import dev.koda.protocol.ClarifyOption
+import dev.koda.protocol.ClarifyRequest
 import dev.koda.protocol.Event
 import dev.koda.protocol.Notice
 import dev.koda.protocol.ToolBegin
@@ -13,6 +15,7 @@ import dev.koda.tools.ToolResult
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -111,6 +114,10 @@ class ToolGate(
             }
         }
 
+        // `ask` is a clarifying question, not a normal tool: surface a picker and
+        // block for the user's answer, which becomes the tool result.
+        if (toolName == "ask") return handleClarify(effectiveArgs)
+
         val callId = UUID.randomUUID().toString()
         events.emit(ToolBegin(session.id, session.currentTurnId, callId, toolName, effectiveArgs.toString()))
         val result = execute(effectiveArgs)
@@ -125,6 +132,23 @@ class ToolGate(
      * subtree's context files (once) by appending them to the tool result —
      * NOT the frozen system prompt, so the prompt-cache prefix is unaffected.
      */
+    /** Emit a clarifying question and block until the surface answers it. */
+    private suspend fun handleClarify(args: JsonObject): String {
+        val question = args["question"]?.jsonPrimitive?.contentOrNull ?: "What would you like to do?"
+        val options = (args["options"] as? JsonArray)?.mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            val label = o["label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            ClarifyOption(label, o["description"]?.jsonPrimitive?.contentOrNull ?: "")
+        } ?: emptyList()
+        val clarifyId = UUID.randomUUID().toString()
+        events.emit(ClarifyRequest(session.id, clarifyId, question, options))
+        return try {
+            session.clarifications.await(clarifyId)
+        } catch (e: CancellationException) {
+            throw e
+        }
+    }
+
     private fun subtreeContext(toolName: String, args: JsonObject): String {
         if (toolName != "read") return ""
         val path = args["file_path"]?.jsonPrimitive?.contentOrNull ?: return ""

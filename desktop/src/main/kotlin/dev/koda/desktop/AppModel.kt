@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.koda.protocol.ApprovalDecision
+import dev.koda.protocol.ClarifyRequest
+import dev.koda.protocol.ClarifyResponse
 import dev.koda.protocol.CreatePr
 import dev.koda.protocol.DirEntry
 import dev.koda.protocol.DirListing
@@ -100,6 +102,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     val sessions = mutableStateListOf<SessionSummary>()
     val checkpoints = mutableStateListOf<CheckpointInfo>()
     var pendingApproval by mutableStateOf<ApprovalRequest?>(null); private set
+    var pendingClarify by mutableStateOf<ClarifyRequest?>(null); private set
 
     // File explorer state
     val dirCache = mutableStateMapOf<String, List<DirEntry>>()
@@ -213,6 +216,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         activity = "Thinking…"
                     }
                     is ApprovalRequest -> if (ev.sessionId == sessionId) pendingApproval = ev
+                    is ClarifyRequest -> if (ev.sessionId == sessionId) pendingClarify = ev
                     is TokenUsage -> if (ev.sessionId == sessionId) usedTokens = ev.inputTokens
                     is Notice -> if (ev.text.isNotBlank()) add { Line.Note(it, ev.text) }
                     is ErrorEvent -> add { Line.Note(it, "error: ${ev.message}", error = true) }
@@ -271,6 +275,12 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
         val p = pendingApproval ?: return
         pendingApproval = null
         scope.launch { client.submit(ApprovalResponse(id(), sessionId, p.approvalId, decision)) }
+    }
+
+    fun answerClarify(answer: String) {
+        val c = pendingClarify ?: return
+        pendingClarify = null
+        scope.launch { client.submit(ClarifyResponse(id(), sessionId, c.clarifyId, answer)) }
     }
 
     fun rewind(steps: Int) { scope.launch { client.submit(Rewind(id(), sessionId, steps)) } }
