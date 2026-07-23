@@ -18,9 +18,14 @@ import dev.koda.protocol.GitCommitResult
 import dev.koda.protocol.GitDiff
 import dev.koda.protocol.GitFileChange
 import dev.koda.protocol.GitStatus
+import dev.koda.protocol.CancelSchedule
+import dev.koda.protocol.CreateSchedule
 import dev.koda.protocol.ListDir
+import dev.koda.protocol.ListSchedules
 import dev.koda.protocol.PrResult
 import dev.koda.protocol.ReviewRequest
+import dev.koda.protocol.ScheduleInfo
+import dev.koda.protocol.ScheduleList
 import dev.koda.protocol.SetModel
 import dev.koda.protocol.ApprovalRequest
 import dev.koda.protocol.ApprovalResponse
@@ -108,6 +113,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     var gitDiff by mutableStateOf(""); private set
     var gitDiffPath by mutableStateOf<String?>(null); private set
 
+    val schedules = mutableStateListOf<ScheduleInfo>()
+
     val contextPercent: Int?
         get() = if (contextLength > 0 && usedTokens > 0) ((usedTokens * 100) / contextLength).toInt().coerceAtMost(100) else null
 
@@ -155,7 +162,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             status = s
             if (s == ConnStatus.Connected && !everConnected) {
                 everConnected = true
-                refreshSessions(); refreshCheckpoints(); loadDir(""); refreshGit()
+                refreshSessions(); refreshCheckpoints(); loadDir(""); refreshGit(); refreshSchedules()
             }
         }
         scope.launch {
@@ -196,6 +203,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         gitFiles.clear(); gitFiles.addAll(ev.files)
                     }
                     is GitDiff -> { gitDiff = ev.unified; gitDiffPath = ev.path }
+                    is ScheduleList -> { schedules.clear(); schedules.addAll(ev.schedules) }
                     is GitCommitResult -> { add { Line.Note(it, "git: ${ev.message}", error = !ev.ok) }; refreshGit() }
                     is PrResult -> add { Line.Note(it, "PR: ${ev.message}", error = !ev.ok) }
                     is CheckpointList -> if (ev.sessionId == sessionId) { checkpoints.clear(); checkpoints.addAll(ev.checkpoints) }
@@ -275,4 +283,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     fun showGitDiff(path: String?) { scope.launch { client.submit(GetGitDiff(id(), sessionId, path, false)) } }
     fun gitCommit(message: String) { scope.launch { client.submit(GitCommit(id(), sessionId, message)) } }
     fun createPr(title: String) { scope.launch { client.submit(CreatePr(id(), sessionId, title, "")) } }
+
+    fun refreshSchedules() { scope.launch { client.submit(ListSchedules(id(), sessionId)) } }
+    fun createSchedule(prompt: String, everySeconds: Long) { scope.launch { client.submit(CreateSchedule(id(), sessionId, prompt, everySeconds)) } }
+    fun cancelSchedule(scheduleId: String) { scope.launch { client.submit(CancelSchedule(id(), sessionId, scheduleId)) } }
 }

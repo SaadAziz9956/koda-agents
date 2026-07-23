@@ -76,6 +76,31 @@ fun SettingsScreen(model: AppModel, onClose: () -> Unit) {
             }
 
             Spacer(Modifier.size(16.dp))
+            Section("Scheduled tasks")
+            model.schedules.forEach { s ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(s.prompt, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                        Text("every ${s.everySeconds}s", fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    EmberTextButton("Cancel", onClick = { model.cancelSchedule(s.id) }, danger = true)
+                }
+            }
+            if (model.schedules.isEmpty()) Text("none", fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 4.dp))
+            var schedPrompt by remember { mutableStateOf("") }
+            var schedEvery by remember { mutableStateOf("3600") }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                EmberField(schedPrompt, { schedPrompt = it }, "prompt to run…", Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                EmberField(schedEvery, { schedEvery = it }, "secs", Modifier.width(72.dp), mono = true)
+                Spacer(Modifier.width(8.dp))
+                EmberButton("Add", onClick = {
+                    val secs = schedEvery.toLongOrNull() ?: 3600
+                    if (schedPrompt.isNotBlank()) { model.createSchedule(schedPrompt, secs); schedPrompt = "" }
+                })
+            }
+
+            Spacer(Modifier.size(16.dp))
             Section("Appearance")
             FieldRow("Theme", "follows system")
             FieldRow("Accent", "Ember")
