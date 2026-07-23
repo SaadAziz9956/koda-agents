@@ -16,6 +16,8 @@ import dev.koda.tools.SkillCreateTool
 import dev.koda.tools.SkillTool
 import dev.koda.tools.SkillWriter
 import dev.koda.tools.TodoTool
+import dev.koda.tools.WebFetchTool
+import dev.koda.tools.WebSearchTool
 import dev.koda.tools.WriteTool
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -152,6 +154,20 @@ class KoogTodoTool(gate: ToolGate) : GatedTool<TodoArgs>(typeToken<TodoArgs>(), 
     }
 }
 
+@Serializable
+data class WebFetchArgs(val url: String)
+
+class KoogWebFetchTool(gate: ToolGate) : GatedTool<WebFetchArgs>(typeToken<WebFetchArgs>(), WebFetchTool(), gate) {
+    override fun toJson(args: WebFetchArgs): JsonObject = buildJsonObject { put("url", args.url) }
+}
+
+@Serializable
+data class WebSearchArgs(val query: String)
+
+class KoogWebSearchTool(gate: ToolGate) : GatedTool<WebSearchArgs>(typeToken<WebSearchArgs>(), WebSearchTool(), gate) {
+    override fun toJson(args: WebSearchArgs): JsonObject = buildJsonObject { put("query", args.query) }
+}
+
 /** The default Koda toolset as a per-session Koog registry. */
 fun kodaToolRegistry(
     gate: ToolGate,
@@ -171,6 +187,8 @@ fun kodaToolRegistry(
             KoogSkillTool(gate),
             KoogMemoryTool(gate, memory),
             KoogSkillCreateTool(gate, skillWriter),
+            KoogWebFetchTool(gate),
+            KoogWebSearchTool(gate),
         )
     )
 }
@@ -192,9 +210,11 @@ fun kodaScopedRegistry(gate: ToolGate, shell: dev.koda.tools.ShellExecutor, name
         "glob" to { KoogGlobTool(gate) },
         "todo" to { KoogTodoTool(gate) },
         "skill" to { KoogSkillTool(gate) },
+        "web_fetch" to { KoogWebFetchTool(gate) },
+        "web_search" to { KoogWebSearchTool(gate) },
     )
     val selected = names?.map { it.lowercase() }?.filter { it in available }?.distinct()
         ?.takeIf { it.isNotEmpty() }
-        ?: listOf("read", "grep", "glob", "skill")
+        ?: listOf("read", "grep", "glob", "skill", "web_fetch", "web_search")
     return ToolRegistry { tools(selected.map { available.getValue(it)() }) }
 }
