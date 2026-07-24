@@ -104,22 +104,28 @@ private fun scheme(k: KodaColors): ColorScheme =
         error = k.danger,
     )
 
+// Type scale is 1:1 with the Ember design system's Figma variables:
+// Display 26/600 (−0.52), Heading 18/600 (−0.48), Body 14.5/400, Caption 12,
+// Eyebrow 11/600 uppercase (+0.66). Geist for UI, JetBrains Mono for machine.
 private val kodaTypography = Typography().run {
     copy(
-        titleLarge = titleLarge.copy(fontFamily = Geist, fontSize = 19.sp, fontWeight = FontWeight.SemiBold),
+        displayLarge = displayLarge.copy(fontFamily = Geist, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.52).sp, lineHeight = 30.sp),
+        titleLarge = titleLarge.copy(fontFamily = Geist, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.48).sp),
         titleMedium = titleMedium.copy(fontFamily = Geist, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
         bodyLarge = bodyLarge.copy(fontFamily = Geist, fontSize = 14.5.sp, lineHeight = 23.sp),
-        bodyMedium = bodyMedium.copy(fontFamily = Geist, fontSize = 13.sp),
+        bodyMedium = bodyMedium.copy(fontFamily = Geist, fontSize = 14.sp),
+        bodySmall = bodySmall.copy(fontFamily = Geist, fontSize = 12.sp),
         labelLarge = labelLarge.copy(fontFamily = Geist, fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-        labelSmall = labelSmall.copy(fontFamily = Geist, fontSize = 11.sp, letterSpacing = 1.0.sp, fontWeight = FontWeight.Bold),
+        labelSmall = labelSmall.copy(fontFamily = Geist, fontSize = 11.sp, letterSpacing = 0.66.sp, fontWeight = FontWeight.SemiBold),
     )
 }
 
+// Radii from the Figma variables: corner radius 5 / 8 / 13.
 private val kodaShapes = Shapes(
     extraSmall = RoundedCornerShape(5.dp),
     small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(11.dp),
-    large = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(13.dp),
+    large = RoundedCornerShape(13.dp),
     extraLarge = RoundedCornerShape(16.dp),
 )
 
