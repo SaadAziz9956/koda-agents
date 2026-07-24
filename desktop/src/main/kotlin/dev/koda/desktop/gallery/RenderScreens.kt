@@ -26,8 +26,8 @@ fun main(args: Array<String>) {
     val outDir = File(args.getOrNull(0) ?: "build/screens").apply { mkdirs() }
     val scope = CoroutineScope(Dispatchers.Default)
 
-    fun render(name: String, w: Int, h: Int, dark: Boolean, content: @Composable () -> Unit) {
-        val scene = ImageComposeScene(width = w, height = h, density = Density(1f), coroutineContext = Dispatchers.Unconfined) {
+    fun render(name: String, w: Int, h: Int, dark: Boolean, density: Float = 1f, content: @Composable () -> Unit) {
+        val scene = ImageComposeScene(width = (w * density).toInt(), height = (h * density).toInt(), density = Density(density), coroutineContext = Dispatchers.Unconfined) {
             KodaTheme(dark = dark) { Box(Modifier.fillMaxSize()) { content() } }
         }
         try {
@@ -54,6 +54,10 @@ fun main(args: Array<String>) {
     }
     render("home-light", 924, 540, dark = false) {
         AppShell(model, onOpenPalette = {}, onOpenSettings = {}, dark = false, onToggleTheme = {}, initialView = AppView.Home)
+    }
+    // Rail alone, high-DPI, for close inspection of the left panel.
+    render("rail", 224, 540, dark = true, density = 2f) {
+        dev.koda.desktop.ui.Rail(model, AppView.Home, {}, Modifier.fillMaxSize())
     }
 
     kotlin.system.exitProcess(0)

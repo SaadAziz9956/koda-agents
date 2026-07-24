@@ -101,23 +101,24 @@ private fun Eyebrow(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun SessionRow(name: String, subtitle: String, count: Int, active: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(9.dp)
+    val shape = RoundedCornerShape(8.dp)
     Row(
         Modifier.fillMaxWidth().clip(shape)
             .background(if (active) MaterialTheme.colorScheme.background else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Dot(if (active) MaterialTheme.colorScheme.primary else Ember.ok, 6.dp)
+        // Dot and count align with the id (top line), not the block centre.
+        Box(Modifier.padding(top = 5.dp)) { Dot(if (active) MaterialTheme.colorScheme.primary else Ember.ok, 6.dp) }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(name, fontSize = 13.sp, fontFamily = Ember.mono, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            Text(name, fontSize = 12.5f.sp, fontFamily = Ember.mono, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface)
-            Text(subtitle, fontSize = 11.5f.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            Text(subtitle, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 1.dp))
         }
         Spacer(Modifier.width(6.dp))
-        Text("$count", fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$count", fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
