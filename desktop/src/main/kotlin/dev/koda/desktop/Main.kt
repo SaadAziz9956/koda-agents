@@ -20,9 +20,8 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import dev.koda.desktop.theme.KodaTheme
 import dev.koda.desktop.ui.AppShell
+import dev.koda.desktop.ui.AppView
 import dev.koda.desktop.ui.CommandPalette
-import dev.koda.desktop.ui.ConnectScreen
-import dev.koda.desktop.ui.SettingsScreen
 import dev.koda.protocol.ApprovalDecision
 
 /**
@@ -34,10 +33,12 @@ fun main(): Unit = application {
     val scope = rememberCoroutineScope()
     val model = remember { AppModel(DaemonClient(scope), scope) }
     var palette by remember { mutableStateOf(false) }
-    var settings by remember { mutableStateOf(false) }
+    var view by remember { mutableStateOf(AppView.Connect) }
     var dark by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) { model.connect(model.daemonUrl) }
+    // Land on Home once the first connection succeeds.
+    LaunchedEffect(model.everConnected) { if (model.everConnected && view == AppView.Connect) view = AppView.Home }
 
     Window(
         onCloseRequest = ::exitApplication,
@@ -65,8 +66,8 @@ fun main(): Unit = application {
         KodaTheme(dark = dark) {
             AppRoot(
                 model = model,
+                view = view, setView = { view = it },
                 palette = palette, setPalette = { palette = it },
-                settings = settings, setSettings = { settings = it },
                 dark = dark, onToggleTheme = { dark = !dark },
             )
         }
@@ -76,17 +77,12 @@ fun main(): Unit = application {
 @Composable
 private fun AppRoot(
     model: AppModel,
+    view: AppView, setView: (AppView) -> Unit,
     palette: Boolean, setPalette: (Boolean) -> Unit,
-    settings: Boolean, setSettings: (Boolean) -> Unit,
     dark: Boolean, onToggleTheme: () -> Unit,
 ) {
-    if (!model.everConnected) {
-        ConnectScreen(model)
-        return
-    }
     Box(Modifier.fillMaxSize()) {
-        AppShell(model, onOpenPalette = { setPalette(true) }, onOpenSettings = { setSettings(true) }, dark = dark, onToggleTheme = onToggleTheme)
-        if (palette) CommandPalette(model, onClose = { setPalette(false) }, onOpenSettings = { setSettings(true) })
-        if (settings) SettingsScreen(model, dark = dark, onToggleTheme = onToggleTheme, onClose = { setSettings(false) })
+        AppShell(model, view = view, setView = setView, onOpenPalette = { setPalette(true) }, dark = dark, onToggleTheme = onToggleTheme)
+        if (palette) CommandPalette(model, onClose = { setPalette(false) }, onOpenSettings = { setView(AppView.Settings); setPalette(false) })
     }
 }

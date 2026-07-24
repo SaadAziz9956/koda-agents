@@ -47,13 +47,16 @@ fun main(args: Array<String>) {
 
     // Match the reference screens' logical size (924×540 dp).
     render("home", 924, 540, dark = true) {
-        AppShell(model, onOpenPalette = {}, onOpenSettings = {}, dark = true, onToggleTheme = {}, initialView = AppView.Home)
+        AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = true, onToggleTheme = {})
     }
     render("code", 924, 540, dark = true) {
-        AppShell(model, onOpenPalette = {}, onOpenSettings = {}, dark = true, onToggleTheme = {}, initialView = AppView.Code)
+        AppShell(model, view = AppView.Code, setView = {}, onOpenPalette = {}, dark = true, onToggleTheme = {})
+    }
+    render("connect", 924, 540, dark = true) {
+        AppShell(model, view = AppView.Connect, setView = {}, onOpenPalette = {}, dark = true, onToggleTheme = {})
     }
     render("home-light", 924, 540, dark = false) {
-        AppShell(model, onOpenPalette = {}, onOpenSettings = {}, dark = false, onToggleTheme = {}, initialView = AppView.Home)
+        AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
     }
     // Rail alone, high-DPI, for close inspection of the left panel.
     render("rail", 224, 540, dark = true, density = 2f) {

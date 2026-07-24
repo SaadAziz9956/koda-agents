@@ -59,39 +59,46 @@ import dev.koda.protocol.ApprovalDecision
 import dev.koda.protocol.ClarifyRequest
 import dev.koda.protocol.PermissionModeSetting
 
-enum class AppView { Home, Code }
+/** Top-level route, selected by the persistent top nav. Home/Code share the
+ *  rail+center+right shell; Connect and Settings are full-width destinations. */
+enum class AppView { Home, Code, Connect, Settings }
 
 @Composable
 fun AppShell(
     model: AppModel,
+    view: AppView,
+    setView: (AppView) -> Unit,
     onOpenPalette: () -> Unit,
-    onOpenSettings: () -> Unit,
     dark: Boolean,
     onToggleTheme: () -> Unit,
-    initialView: AppView = AppView.Code,
 ) {
-    var view by remember { mutableStateOf(initialView) }
     val k = LocalKoda.current
     Column(Modifier.fillMaxSize().background(k.bg)) {
-        TopReviewNav(view, { view = it }, onOpenPalette, onOpenSettings, dark, onToggleTheme)
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-            Rail(model, view, { view = it }, Modifier.width(224.dp).fillMaxHeight())
-            VDivider()
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                TopBar(model, onOpenPalette, onOpenSettings)
-                HDivider()
-                if (model.status != ConnStatus.Connected) ReconnectBanner(model)
-                if (view == AppView.Code) {
-                    Box(Modifier.weight(1f).fillMaxWidth()) { CodeEditor(model) }
-                } else {
-                    Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
-                    HDivider()
-                    Composer(model, onOpenSettings)
+        TopReviewNav(view, setView, onOpenPalette, dark, onToggleTheme)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (view) {
+                AppView.Connect -> ConnectScreen(model)
+                AppView.Settings -> SettingsScreen(model, dark = dark, onToggleTheme = onToggleTheme, onClose = { setView(AppView.Home) })
+                else -> Row(Modifier.fillMaxSize()) {
+                    Rail(model, view, setView, Modifier.width(224.dp).fillMaxHeight())
+                    VDivider()
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        TopBar(model, onOpenPalette, onOpenSettings = { setView(AppView.Settings) })
+                        HDivider()
+                        if (model.status != ConnStatus.Connected) ReconnectBanner(model)
+                        if (view == AppView.Code) {
+                            Box(Modifier.weight(1f).fillMaxWidth()) { CodeEditor(model) }
+                        } else {
+                            Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
+                            HDivider()
+                            Composer(model, onOpenSettings = { setView(AppView.Settings) })
+                        }
+                    }
+                    if (view == AppView.Code) {
+                        VDivider()
+                        ContextPanel(model, Modifier.width(344.dp).fillMaxHeight())
+                    }
                 }
-            }
-            if (view == AppView.Code) {
-                VDivider()
-                ContextPanel(model, Modifier.width(344.dp).fillMaxHeight())
             }
         }
     }
@@ -100,7 +107,7 @@ fun AppShell(
 @Composable
 private fun TopReviewNav(
     view: AppView, setView: (AppView) -> Unit,
-    onOpenPalette: () -> Unit, onOpenSettings: () -> Unit,
+    onOpenPalette: () -> Unit,
     dark: Boolean, onToggleTheme: () -> Unit,
 ) {
     val k = LocalKoda.current
@@ -118,7 +125,8 @@ private fun TopReviewNav(
         Spacer(Modifier.width(14.dp))
         NavTab("Home", view == AppView.Home) { setView(AppView.Home) }
         NavTab("Code", view == AppView.Code) { setView(AppView.Code) }
-        NavTab("Settings", false, onOpenSettings)
+        NavTab("Connect", view == AppView.Connect) { setView(AppView.Connect) }
+        NavTab("Settings", view == AppView.Settings) { setView(AppView.Settings) }
         Spacer(Modifier.weight(1f))
         Row(
             Modifier.height(26.dp).clip(RoundedCornerShape(7.dp)).background(k.surface).border(1.dp, k.border, RoundedCornerShape(7.dp))
