@@ -69,7 +69,7 @@ sealed interface Line {
     val key: Int
     data class User(override val key: Int, val text: String) : Line
     data class Assistant(override val key: Int, val text: String) : Line
-    data class Tool(override val key: Int, val name: String, val detail: String, val status: ToolStatus, val diff: String? = null) : Line
+    data class Tool(override val key: Int, val name: String, val detail: String, val status: ToolStatus, val diff: String? = null, val meta: String = "") : Line
     data class Note(override val key: Int, val text: String, val error: Boolean = false) : Line
 }
 
@@ -185,6 +185,34 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
         }
     }
 
+    /** The tool card's accent-soft target — the primary argument (path/pattern/command). */
+    private fun toolTarget(tool: String, argsJson: String): String {
+        fun arg(vararg keys: String): String? =
+            keys.firstNotNullOfOrNull { Regex("\"$it\"\\s*:\\s*\"([^\"]+)\"").find(argsJson)?.groupValues?.get(1) }
+        return when (tool) {
+            "read", "write", "edit" -> arg("file_path", "path") ?: ""
+            "grep" -> arg("pattern", "query")?.let { "\"$it\"" }?.plus(arg("path")?.let { " $it" } ?: "") ?: ""
+            "glob" -> arg("pattern") ?: ""
+            "bash" -> arg("command")?.take(60) ?: ""
+            "web_search" -> arg("query")?.let { "\"$it\"" } ?: ""
+            "web_fetch" -> arg("url") ?: ""
+            else -> arg("path", "file_path", "query", "pattern") ?: ""
+        }
+    }
+
+    /** The tool card's faint right-aligned meta — a short result summary. */
+    private fun toolMeta(tool: String, output: String, isError: Boolean): String {
+        if (isError) return "error"
+        val lines = output.count { it == '\n' } + if (output.isNotEmpty()) 1 else 0
+        return when (tool) {
+            "read" -> "$lines lines"
+            "grep", "glob" -> "$lines matches"
+            "bash" -> if (lines > 0) "$lines lines" else "done"
+            "edit", "write" -> "done"
+            else -> "done"
+        }
+    }
+
     init {
         client.onStatus = { s ->
             status = s
@@ -221,15 +249,15 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     is ToolBegin -> {
                         clearStream()
                         activity = activityFor(ev.toolName, ev.argsJson)
-                        add { Line.Tool(it, ev.toolName, ev.argsJson.take(140), ToolStatus.Running) }
+                        add { Line.Tool(it, ev.toolName, toolTarget(ev.toolName, ev.argsJson), ToolStatus.Running, meta = "running…") }
                     }
                     is ToolEnd -> {
                         // mark the most recent running step of this tool done
                         val idx = lines.indexOfLast { it is Line.Tool && it.name == ev.toolName && it.status == ToolStatus.Running }
-                        val detail = ev.output.lineSequence().firstOrNull()?.take(120) ?: ""
                         val st = if (ev.isError) ToolStatus.Error else ToolStatus.Ok
-                        if (idx >= 0) lines[idx] = (lines[idx] as Line.Tool).copy(detail = detail.ifBlank { "done" }, status = st, diff = ev.diff)
-                        else add { Line.Tool(it, ev.toolName, detail, st, ev.diff) }
+                        val meta = toolMeta(ev.toolName, ev.output, ev.isError)
+                        if (idx >= 0) lines[idx] = (lines[idx] as Line.Tool).copy(status = st, diff = ev.diff, meta = meta)
+                        else add { Line.Tool(it, ev.toolName, toolTarget(ev.toolName, ""), st, ev.diff, meta) }
                         activity = "Thinking…"
                     }
                     is ApprovalRequest -> if (ev.sessionId == sessionId) pendingApproval = ev
@@ -367,10 +395,10 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             +  return timingSafeEqual(hashed, expected)
              }
         """.trimIndent()
-        lines.add(Line.Tool(2, "read_file", "tests/auth.test.ts", ToolStatus.Ok))
-        lines.add(Line.Tool(3, "grep", "\"verifyToken\"", ToolStatus.Ok))
-        lines.add(Line.Tool(4, "read_file", "src/auth.ts", ToolStatus.Ok))
-        lines.add(Line.Tool(5, "edit_file", "src/auth.ts", ToolStatus.Ok, diff))
+        lines.add(Line.Tool(2, "read_file", "tests/auth.test.ts", ToolStatus.Ok, meta = "42 lines"))
+        lines.add(Line.Tool(3, "grep", "\"verifyToken\" src/", ToolStatus.Ok, meta = "3 matches"))
+        lines.add(Line.Tool(4, "read_file", "src/auth.ts", ToolStatus.Running, meta = "reading…"))
+        streaming = "I traced the failure to verifyToken. It was comparing the raw incoming token directly against the stored hash"
         checkpoints.addAll(listOf(
             CheckpointInfo(3, "Ran auth suite", 0),
             CheckpointInfo(2, "Edited src/auth.ts", 1),

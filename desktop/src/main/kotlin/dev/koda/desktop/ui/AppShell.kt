@@ -94,10 +94,9 @@ fun AppShell(
                             Composer(model, onOpenSettings = { setView(AppView.Settings) })
                         }
                     }
-                    if (view == AppView.Code) {
-                        VDivider()
-                        ContextPanel(model, Modifier.width(344.dp).fillMaxHeight())
-                    }
+                    // The right panel (Rewind/Files/Git) is present in both Home and Code.
+                    VDivider()
+                    ContextPanel(model, Modifier.width(344.dp).fillMaxHeight())
                 }
             }
         }
@@ -277,18 +276,32 @@ private fun Transcript(model: AppModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 26.dp, bottom = 14.dp),
     ) {
-        items(model.lines, key = { it.key }) { line ->
+        // Split at the last user message so the current turn's agent block can be
+        // headed by the agent avatar + activity pill, with its tools/reply indented
+        // beneath — matching the handoff's mid-stream layout.
+        val lastUser = model.lines.indexOfLast { it is Line.User }
+        val head = if (lastUser >= 0) model.lines.take(lastUser + 1) else model.lines.toList()
+        val tail = if (lastUser >= 0) model.lines.drop(lastUser + 1) else emptyList()
+        items(head, key = { it.key }) { line ->
             when (line) {
                 is Line.User -> Box(convo) { UserLine(line) }
                 is Line.Assistant -> Box(convo) { AssistantLine(line) }
                 else -> Box(convoAgent) { LineView(line) }
             }
         }
+        // Agent-turn header: avatar + live activity pill.
+        if (model.working) {
+            item(key = -4) {
+                Row(convo, verticalAlignment = Alignment.Top) {
+                    AgentAvatar()
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.weight(1f)) { ActivityLine(model, model.activity ?: "Working…") }
+                }
+            }
+        }
+        items(tail, key = { it.key }) { line -> Box(convoAgent) { LineView(line) } }
         if (model.reasoning.isNotBlank()) item(key = -3) { Box(convoAgent) { ReasoningBlock(model.reasoning) } }
         if (model.streaming.isNotBlank()) item(key = -1) { Box(convoAgent) { StreamingLine(model.streaming) } }
-        if (model.working && model.streaming.isBlank() && model.reasoning.isBlank()) {
-            item(key = -4) { Box(convoAgent) { ActivityLine(model, model.activity ?: "Working…") } }
-        }
         model.pendingApproval?.let { req -> item(key = -2) { Box(convoAgent) { ApprovalCard(req.summary) { model.approve(it) } } } }
         model.pendingClarify?.let { c -> item(key = -5) { Box(convoAgent) { ClarifyCard(c, model) } } }
     }
@@ -450,6 +463,8 @@ private fun ToolCard(line: Line.Tool) {
                     "▸", fontFamily = Ember.mono, fontSize = 11.sp, color = k.faint,
                     modifier = Modifier.rotate(if (expanded) 90f else 0f),
                 )
+            } else if (line.meta.isNotBlank()) {
+                Text(line.meta, fontFamily = Ember.mono, fontSize = 11.sp, color = k.faint)
             }
         }
         // Diff body — attached, with a raised filename + count header bar.
@@ -679,11 +694,15 @@ private fun Composer(model: AppModel, onOpenSettings: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ModeMenu(model)
-                ModelMenu(model)
+                if (!model.working) ModelMenu(model)
                 Spacer(Modifier.weight(1f))
-                AttachButton { attachments.add(it) }
-                if (model.working) EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
-                EmberButton("Send  →", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
+                if (model.working) {
+                    // Mid-stream: only Stop (model/attach hidden), matching the design.
+                    EmberButton("Stop", onClick = { model.interrupt() })
+                } else {
+                    AttachButton { attachments.add(it) }
+                    EmberButton("Send  →", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
+                }
             }
         }
     }

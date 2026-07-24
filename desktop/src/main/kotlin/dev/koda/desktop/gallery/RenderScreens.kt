@@ -46,8 +46,8 @@ fun main(args: Array<String>) {
     val model = AppModel(DaemonClient(scope), scope).apply { previewSeed(0L) }
 
     // Match the reference screens' logical size (924×540 dp).
-    render("home", 924, 540, dark = true) {
-        AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = true, onToggleTheme = {})
+    render("home", 1280, 812, dark = false) {
+        AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
     }
     render("code", 1280, 812, dark = false) {
         AppShell(model, view = AppView.Code, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
