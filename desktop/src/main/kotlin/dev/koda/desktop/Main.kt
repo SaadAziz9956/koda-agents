@@ -36,6 +36,7 @@ fun main(): Unit = application {
     val model = remember { AppModel(DaemonClient(scope), scope) }
     var palette by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
+    var dark by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) { model.connect(model.daemonUrl) }
 
@@ -62,11 +63,12 @@ fun main(): Unit = application {
             }
         },
     ) {
-        KodaTheme {
+        KodaTheme(dark = dark) {
             AppRoot(
                 model = model,
                 palette = palette, setPalette = { palette = it },
                 settings = settings, setSettings = { settings = it },
+                dark = dark, onToggleTheme = { dark = !dark },
             )
         }
     }
@@ -77,13 +79,14 @@ private fun AppRoot(
     model: AppModel,
     palette: Boolean, setPalette: (Boolean) -> Unit,
     settings: Boolean, setSettings: (Boolean) -> Unit,
+    dark: Boolean, onToggleTheme: () -> Unit,
 ) {
     if (!model.everConnected) {
         ConnectScreen(model)
         return
     }
     Box(Modifier.fillMaxSize()) {
-        AppShell(model, onOpenPalette = { setPalette(true) }, onOpenSettings = { setSettings(true) })
+        AppShell(model, onOpenPalette = { setPalette(true) }, onOpenSettings = { setSettings(true) }, dark = dark, onToggleTheme = onToggleTheme)
         if (palette) CommandPalette(model, onClose = { setPalette(false) }, onOpenSettings = { setSettings(true) })
         if (settings) SettingsScreen(model, onClose = { setSettings(false) })
         if (model.openFilePath != null) FileViewer(model)

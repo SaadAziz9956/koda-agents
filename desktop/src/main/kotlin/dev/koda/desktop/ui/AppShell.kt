@@ -45,7 +45,11 @@ import dev.koda.desktop.AppModel
 import dev.koda.desktop.ConnStatus
 import dev.koda.desktop.Line
 import dev.koda.desktop.ToolStatus
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Brush
 import dev.koda.desktop.theme.Ember
+import dev.koda.desktop.theme.LocalKoda
 import dev.koda.protocol.ApprovalDecision
 import dev.koda.protocol.ClarifyRequest
 import dev.koda.protocol.PermissionModeSetting
@@ -53,24 +57,90 @@ import dev.koda.protocol.PermissionModeSetting
 enum class AppView { Home, Code }
 
 @Composable
-fun AppShell(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: () -> Unit) {
+fun AppShell(
+    model: AppModel,
+    onOpenPalette: () -> Unit,
+    onOpenSettings: () -> Unit,
+    dark: Boolean,
+    onToggleTheme: () -> Unit,
+) {
     var view by remember { mutableStateOf(AppView.Code) }
-    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Rail(model, view, { view = it }, Modifier.width(230.dp).fillMaxHeight())
-        VDivider()
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            TopBar(model, onOpenPalette, onOpenSettings)
-            HDivider()
-            if (model.status != ConnStatus.Connected) ReconnectBanner(model)
-            Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
-            HDivider()
-            Composer(model, onOpenSettings)
-        }
-        // The coding workspace (Files/Git/Rewind) only shows in Code view.
-        if (view == AppView.Code) {
+    val k = LocalKoda.current
+    Column(Modifier.fillMaxSize().background(k.bg)) {
+        TopReviewNav(view, { view = it }, onOpenPalette, onOpenSettings, dark, onToggleTheme)
+        Row(Modifier.weight(1f).fillMaxWidth()) {
+            Rail(model, view, { view = it }, Modifier.width(224.dp).fillMaxHeight())
             VDivider()
-            ContextPanel(model, Modifier.width(320.dp).fillMaxHeight())
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                TopBar(model, onOpenPalette, onOpenSettings)
+                HDivider()
+                if (model.status != ConnStatus.Connected) ReconnectBanner(model)
+                Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
+                HDivider()
+                Composer(model, onOpenSettings)
+            }
+            if (view == AppView.Code) {
+                VDivider()
+                ContextPanel(model, Modifier.width(344.dp).fillMaxHeight())
+            }
         }
+    }
+}
+
+@Composable
+private fun TopReviewNav(
+    view: AppView, setView: (AppView) -> Unit,
+    onOpenPalette: () -> Unit, onOpenSettings: () -> Unit,
+    dark: Boolean, onToggleTheme: () -> Unit,
+) {
+    val k = LocalKoda.current
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).background(k.rail).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(16.dp).clip(RoundedCornerShape(5.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))))
+        Spacer(Modifier.width(9.dp))
+        Text("Koda", fontSize = 13.5f.sp, fontWeight = FontWeight.SemiBold, color = k.text)
+        Spacer(Modifier.width(9.dp))
+        Box(Modifier.clip(RoundedCornerShape(5.dp)).border(1.dp, k.border, RoundedCornerShape(5.dp)).padding(horizontal = 5.dp, vertical = 1.dp)) {
+            Text("v0.9", fontFamily = Ember.mono, fontSize = 10.sp, color = k.faint)
+        }
+        Spacer(Modifier.width(14.dp))
+        NavTab("Home", view == AppView.Home) { setView(AppView.Home) }
+        NavTab("Code", view == AppView.Code) { setView(AppView.Code) }
+        NavTab("Settings", false, onOpenSettings)
+        Spacer(Modifier.weight(1f))
+        Row(
+            Modifier.height(26.dp).clip(RoundedCornerShape(7.dp)).background(k.surface).border(1.dp, k.border, RoundedCornerShape(7.dp))
+                .clickable(onClick = onOpenPalette).padding(start = 10.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Text("Search", fontSize = 11.5f.sp, color = k.dim)
+            Box(Modifier.clip(RoundedCornerShape(4.dp)).background(k.raised).border(1.dp, k.border, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                Text("⌘K", fontFamily = Ember.mono, fontSize = 10.sp, color = k.dim)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(k.surface).border(1.dp, k.border, RoundedCornerShape(7.dp))
+                .clickable(onClick = onToggleTheme),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(if (dark) KIcons.moon else KIcons.sun, contentDescription = "theme", tint = k.dim, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun NavTab(label: String, active: Boolean, onClick: () -> Unit) {
+    val k = LocalKoda.current
+    Box(
+        Modifier.height(28.dp).clip(RoundedCornerShape(8.dp))
+            .then(if (active) Modifier.background(k.surface).border(1.dp, k.border, RoundedCornerShape(8.dp)) else Modifier)
+            .clickable(onClick = onClick).padding(horizontal = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, color = if (active) k.text else k.dim)
     }
 }
 
