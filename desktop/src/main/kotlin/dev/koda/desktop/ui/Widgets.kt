@@ -53,6 +53,24 @@ fun Dot(color: Color, size: Dp = 8.dp) {
     Box(Modifier.size(size).clip(CircleShape).background(color))
 }
 
+/** Spinning ring (arc with a transparent gap at the head) — the tool "running"
+ *  marker, matching the handoff's `koda-spin` border-top-transparent circle. */
+@Composable
+fun Spinner(size: Dp, color: Color, strokeWidth: Dp = 1.6.dp) {
+    val t = rememberInfiniteTransition()
+    val angle by t.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Restart),
+    )
+    Canvas(Modifier.size(size)) {
+        val sw = strokeWidth.toPx()
+        val d = this.size.minDimension - sw
+        val tl = Offset((this.size.width - d) / 2f, (this.size.height - d) / 2f)
+        // 300° sweep leaves a 60° gap, giving the "border-top-transparent" look.
+        drawArc(color, angle, 300f, false, tl, Size(d, d), style = Stroke(sw, cap = StrokeCap.Round))
+    }
+}
+
 @Composable
 fun HDivider() {
     Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))

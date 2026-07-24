@@ -33,7 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -49,6 +52,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import dev.koda.desktop.theme.Ember
 import dev.koda.desktop.theme.LocalKoda
 import dev.koda.protocol.ApprovalDecision
@@ -347,6 +351,8 @@ private fun StreamingLine(text: String) {
 
 @Composable
 private fun ActivityLine(model: AppModel, text: String) {
+    val k = LocalKoda.current
+    val running = model.working
     var elapsed by remember { mutableStateOf(0L) }
     LaunchedEffect(model.turnStartMs) {
         while (model.working && model.turnStartMs > 0) {
@@ -354,80 +360,158 @@ private fun ActivityLine(model: AppModel, text: String) {
             kotlinx.coroutines.delay(500)
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().shimmer()) {
-        Dot(MaterialTheme.colorScheme.primary, 7.dp)
-        Spacer(Modifier.width(9.dp))
-        Text(text, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(10.dp))
-        val tokens = model.turnOutChars / 4
-        val meta = buildString {
-            append("${elapsed / 1000}s")
-            if (tokens > 0) append("  ·  ↓${tokens} tok")
-            if (model.thoughtMs > 0) append("  ·  thought ${model.thoughtMs / 1000}s")
+    val tokens = model.turnOutChars / 4
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .background(k.surface)
+            .border(1.dp, if (running) k.strong else k.border, RoundedCornerShape(9.dp))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        ActivityDot(running)
+        Text(if (running) text.ifBlank { "Responding…" } else "Done", fontFamily = Ember.mono, fontSize = 12.sp, color = k.text)
+        Sep(); Text("${elapsed / 1000}s", fontFamily = Ember.mono, fontSize = 12.sp, color = k.dim)
+        Sep(); Text("↓$tokens tok", fontFamily = Ember.mono, fontSize = 12.sp, color = k.dim)
+        if (model.thoughtMs > 0) {
+            Sep(); Text("thought ${model.thoughtMs / 1000}s", fontFamily = Ember.mono, fontSize = 12.sp, color = k.faint)
         }
-        Text(meta, fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+        if (running) {
+            Box(
+                Modifier.weight(1f).height(2.dp).padding(start = 6.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, k.glow, Color.Transparent)))
+                    .shimmer(),
+            )
+        }
     }
 }
 
 @Composable
+private fun Sep() {
+    Text("·", color = LocalKoda.current.faint, fontSize = 12.sp)
+}
+
+/** The activity dot — accent + glow + pulse while running, calm ok when done. */
+@Composable
+private fun ActivityDot(running: Boolean) {
+    val k = LocalKoda.current
+    val alpha = if (running) blinkAlpha() else 1f
+    Box(
+        Modifier.size(7.dp).clip(RoundedCornerShape(50))
+            .background((if (running) k.accent else k.ok).copy(alpha = alpha)),
+    )
+}
+
+@Composable
 private fun ToolCard(line: Line.Tool) {
-    val shape = RoundedCornerShape(11.dp)
+    val k = LocalKoda.current
     val hasDiff = !line.diff.isNullOrBlank()
     var expanded by remember(line.key) { mutableStateOf(true) }
-    Column(
-        Modifier.fillMaxWidth().clip(shape).border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .then(if (line.status == ToolStatus.Running) Modifier.shimmer() else Modifier)
-            .padding(11.dp),
-    ) {
+    val open = hasDiff && expanded
+    val shape = if (open) RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp) else RoundedCornerShape(9.dp)
+    Column(Modifier.fillMaxWidth()) {
+        // Head row.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = if (hasDiff) Modifier.fillMaxWidth().clickable { expanded = !expanded } else Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            modifier = Modifier.fillMaxWidth().clip(shape)
+                .background(k.surface).border(1.dp, k.border, shape)
+                .then(if (hasDiff) Modifier.clickable { expanded = !expanded } else Modifier)
+                .padding(horizontal = 11.dp, vertical = 8.dp),
         ) {
-            val (glyph, color) = when (line.status) {
-                ToolStatus.Running -> "◐" to MaterialTheme.colorScheme.primary
-                ToolStatus.Ok -> "✓" to Ember.ok
-                ToolStatus.Error -> "✗" to MaterialTheme.colorScheme.error
-            }
-            Text(glyph, color = color, fontFamily = Ember.mono, fontSize = 13.sp)
-            Spacer(Modifier.width(9.dp))
-            Text(line.name, fontFamily = Ember.mono, fontWeight = FontWeight.Bold, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface)
-            Spacer(Modifier.width(9.dp))
-            Text(line.detail, fontFamily = Ember.mono, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.weight(1f))
+            ToolStatusGlyph(line.status)
+            Text(line.name, fontFamily = Ember.mono, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = k.text)
+            Text(
+                line.detail, fontFamily = Ember.mono, fontSize = 12.sp, color = k.accentSoft,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
             if (hasDiff) {
                 val adds = line.diff!!.lines().count { it.startsWith("+") && !it.startsWith("+++") }
                 val dels = line.diff.lines().count { it.startsWith("-") && !it.startsWith("---") }
-                Spacer(Modifier.width(8.dp))
-                Text("+$adds", color = Ember.ok, fontFamily = Ember.mono, fontSize = 11.sp)
-                Spacer(Modifier.width(5.dp))
-                Text("−$dels", color = MaterialTheme.colorScheme.error, fontFamily = Ember.mono, fontSize = 11.sp)
-                Spacer(Modifier.width(8.dp))
-                Text(if (expanded) "▾" else "▸", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                Text("+$adds −$dels", fontFamily = Ember.mono, fontSize = 11.sp, color = k.dim)
+                Text(
+                    "▸", fontFamily = Ember.mono, fontSize = 11.sp, color = k.faint,
+                    modifier = Modifier.rotate(if (expanded) 90f else 0f),
+                )
             }
         }
-        if (hasDiff && expanded) {
-            Spacer(Modifier.size(8.dp))
-            DiffView(line.diff!!)
+        // Diff body — attached, with a raised filename + count header bar.
+        if (open) {
+            val botShape = RoundedCornerShape(bottomStart = 9.dp, bottomEnd = 9.dp)
+            Column(Modifier.fillMaxWidth().clip(botShape).background(k.surface).border(1.dp, k.border, botShape)) {
+                val adds = line.diff!!.lines().count { it.startsWith("+") && !it.startsWith("+++") }
+                val dels = line.diff.lines().count { it.startsWith("-") && !it.startsWith("---") }
+                Row(
+                    Modifier.fillMaxWidth().background(k.raised).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(line.detail, fontFamily = Ember.mono, fontSize = 11.sp, color = k.dim, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("+$adds", fontFamily = Ember.mono, fontSize = 11.sp, color = k.diffAddTx)
+                    Spacer(Modifier.width(6.dp))
+                    Text("−$dels", fontFamily = Ember.mono, fontSize = 11.sp, color = k.diffDelTx)
+                }
+                HDivider()
+                DiffView(line.diff, embedded = true)
+            }
+        }
+    }
+}
+
+/** Tool status marker: spinning ring (running), filled ✓ (ok), filled ! (error). */
+@Composable
+private fun ToolStatusGlyph(status: ToolStatus) {
+    val k = LocalKoda.current
+    when (status) {
+        ToolStatus.Running -> Spinner(15.dp, k.accent)
+        ToolStatus.Ok -> Box(Modifier.size(15.dp).clip(RoundedCornerShape(50)).background(k.ok), contentAlignment = Alignment.Center) {
+            Text("✓", color = k.onAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
+        ToolStatus.Error -> Box(Modifier.size(15.dp).clip(RoundedCornerShape(50)).background(k.danger), contentAlignment = Alignment.Center) {
+            Text("!", color = k.onAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
 private fun ApprovalCard(summary: String, onDecide: (ApprovalDecision) -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        Modifier.fillMaxWidth().clip(shape).border(1.dp, MaterialTheme.colorScheme.primary, shape)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)).padding(14.dp),
+    val k = LocalKoda.current
+    val shape = RoundedCornerShape(10.dp)
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(shape)
+            .background(k.surface).border(1.dp, k.strong, shape),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("APPROVAL NEEDED", fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.size(8.dp))
-        Text(summary, fontFamily = Ember.mono, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.size(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            EmberButton("Allow  Y", onClick = { onDecide(ApprovalDecision.APPROVE) })
-            EmberGhostButton("Always  A", onClick = { onDecide(ApprovalDecision.APPROVE_ALWAYS) })
-            EmberTextButton("Deny  N", onClick = { onDecide(ApprovalDecision.DENY) }, danger = true)
+        Box(Modifier.width(2.dp).fillMaxHeight().background(k.accent))
+        Row(
+            Modifier.weight(1f).padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(KIcons.shield, contentDescription = null, tint = k.accent, modifier = Modifier.size(16.dp))
+            Text(summary, fontSize = 13.sp, color = k.text, modifier = Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MonoKeyButton("Y", onDecide, ApprovalDecision.APPROVE, filled = true)
+                MonoKeyButton("A", onDecide, ApprovalDecision.APPROVE_ALWAYS)
+                MonoKeyButton("N", onDecide, ApprovalDecision.DENY)
+            }
         }
+    }
+}
+
+@Composable
+private fun MonoKeyButton(label: String, onDecide: (ApprovalDecision) -> Unit, decision: ApprovalDecision, filled: Boolean = false) {
+    val k = LocalKoda.current
+    val shape = RoundedCornerShape(7.dp)
+    Box(
+        Modifier.clip(shape)
+            .background(if (filled) k.accent else k.raised)
+            .then(if (filled) Modifier else Modifier.border(1.dp, k.border, shape))
+            .clickable { onDecide(decision) }
+            .padding(horizontal = 11.dp, vertical = 5.dp),
+    ) {
+        Text(label, fontFamily = Ember.mono, fontSize = 11.5f.sp, fontWeight = if (filled) FontWeight.SemiBold else FontWeight.Normal, color = if (filled) k.onAccent else k.text)
     }
 }
 
@@ -442,45 +526,65 @@ private val SLASH_CMDS = listOf(
 
 @Composable
 private fun ClarifyCard(c: ClarifyRequest, model: AppModel) {
-    val shape = RoundedCornerShape(12.dp)
+    val k = LocalKoda.current
+    val shape = RoundedCornerShape(11.dp)
     var typing by remember(c.clarifyId) { mutableStateOf(false) }
     var custom by remember(c.clarifyId) { mutableStateOf("") }
     Column(
-        Modifier.fillMaxWidth().clip(shape).border(1.dp, MaterialTheme.colorScheme.primary, shape)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)).padding(15.dp),
+        Modifier.fillMaxWidth().clip(shape).background(k.surface).border(1.dp, k.strong, shape),
     ) {
-        Text("NEEDS INPUT", fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.size(8.dp))
-        Text(c.question, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.size(12.dp))
-        c.options.forEachIndexed { i, opt ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { model.answerClarify(opt.label) }
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-            ) {
-                Text("${i + 1}", fontFamily = Ember.mono, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(22.dp))
-                Column {
-                    Text(opt.label, fontSize = 13.5f.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                    if (opt.description.isNotBlank()) {
-                        Text(opt.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 17.sp)
+        // Header on the hi-gradient wash.
+        Column(
+            Modifier.fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(k.hi, Color.Transparent)))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Text(c.question, fontSize = 13.5f.sp, fontWeight = FontWeight.SemiBold, color = k.text)
+            Text("Pick an option or reply in your own words.", fontSize = 12.sp, color = k.dim, modifier = Modifier.padding(top = 2.dp))
+        }
+        HDivider()
+        Column(Modifier.padding(6.dp)) {
+            c.options.forEachIndexed { i, opt ->
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 2.dp).clip(RoundedCornerShape(8.dp))
+                        .clickable { model.answerClarify(opt.label) }
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(11.dp),
+                ) {
+                    Box(
+                        Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(k.raised).border(1.dp, k.border, RoundedCornerShape(6.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("${i + 1}", fontFamily = Ember.mono, fontSize = 11.sp, color = k.dim) }
+                    Column(Modifier.weight(1f)) {
+                        Text(opt.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = k.text)
+                        if (opt.description.isNotBlank()) {
+                            Text(opt.description, fontSize = 11.5f.sp, color = k.dim, lineHeight = 16.sp)
+                        }
                     }
                 }
             }
-        }
-        Spacer(Modifier.size(6.dp)); HDivider(); Spacer(Modifier.size(6.dp))
-        if (!typing) {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { typing = true }.padding(horizontal = 8.dp, vertical = 8.dp)) {
-                Text("✎  Type something else", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Footer: type-something (dashed) + chat-about-this (solid).
+            if (!typing) {
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, k.border, RoundedCornerShape(8.dp))
+                            .clickable { typing = true }.padding(horizontal = 10.dp, vertical = 7.dp),
+                    ) { Text("Type something…", fontSize = 12.sp, color = k.dim) }
+                    Box(
+                        Modifier.clip(RoundedCornerShape(8.dp)).border(1.dp, k.border, RoundedCornerShape(8.dp))
+                            .clickable { model.answerClarify("Let's talk this through instead of picking one of those options.") }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    ) { Text("Chat about this", fontSize = 12.sp, color = k.dim) }
+                }
+            } else {
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    EmberField(custom, { custom = it }, "Your answer…", Modifier.weight(1f), onSubmit = { if (custom.isNotBlank()) model.answerClarify(custom) })
+                    Spacer(Modifier.width(8.dp))
+                    EmberButton("Send", onClick = { if (custom.isNotBlank()) model.answerClarify(custom) })
+                }
             }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                EmberField(custom, { custom = it }, "Your answer…", Modifier.weight(1f), onSubmit = { if (custom.isNotBlank()) model.answerClarify(custom) })
-                Spacer(Modifier.width(8.dp))
-                EmberButton("Send", onClick = { if (custom.isNotBlank()) model.answerClarify(custom) })
-            }
-        }
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { model.answerClarify("Let's talk this through instead of picking one of those options.") }.padding(horizontal = 8.dp, vertical = 8.dp)) {
-            Text("💬  Chat about this", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
