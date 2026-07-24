@@ -71,16 +71,19 @@ fun GitPanel(model: AppModel, modifier: Modifier = Modifier) {
         if (model.gitFiles.isEmpty()) {
             Text("working tree clean", fontFamily = JetBrainsMono, fontSize = 12.sp, color = k.dim)
         } else {
-            model.gitFiles.forEach { f -> GitFileRow(f, model.gitDiffPath == f.path) { model.showGitDiff(f.path) } }
+            model.gitFiles.forEach { f ->
+                val d = if (model.gitDiffPath == f.path) model.gitDiff else ""
+                val adds = d.lines().count { it.startsWith("+") && !it.startsWith("+++") }
+                val dels = d.lines().count { it.startsWith("-") && !it.startsWith("---") }
+                GitFileRow(f, adds, dels) { model.showGitDiff(f.path); model.openFile(f.path) }
+            }
         }
-        // Selected diff.
-        if (model.gitDiff.isNotBlank()) {
-            Spacer(Modifier.height(12.dp))
-            DiffView(model.gitDiff, maxHeight = 260)
-        }
-        // Commit box.
+        // Commit box — a multi-line message field, then Commit / Open PR.
         Spacer(Modifier.height(16.dp))
-        EmberField(message, { message = it }, "Commit message…", Modifier.fillMaxWidth())
+        Box(
+            Modifier.fillMaxWidth().height(70.dp).clip(RoundedCornerShape(9.dp)).background(k.surface)
+                .border(1.dp, k.border, RoundedCornerShape(9.dp)).padding(horizontal = 11.dp, vertical = 9.dp),
+        ) { EmberField(message, { message = it }, "Commit message…", Modifier.fillMaxWidth(), bordered = false) }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             EmberButton("Commit", onClick = { if (message.isNotBlank()) { model.gitCommit(message); message = "" } }, modifier = Modifier.weight(1f))
             EmberGhostButton("Open PR ↗", onClick = { model.createPr(model.gitBranch.ifBlank { "Koda changes" }) })
@@ -89,7 +92,7 @@ fun GitPanel(model: AppModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun GitFileRow(f: GitFileChange, selected: Boolean, onClick: () -> Unit) {
+private fun GitFileRow(f: GitFileChange, adds: Int, dels: Int, onClick: () -> Unit) {
     val k = LocalKoda.current
     val (glyph, color) = when (f.status) {
         "added" -> "A" to k.diffAddTx
@@ -99,13 +102,13 @@ private fun GitFileRow(f: GitFileChange, selected: Boolean, onClick: () -> Unit)
     }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(7.dp))
-            .background(if (selected) k.surface else Color.Transparent)
             .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         Text(glyph, fontFamily = JetBrainsMono, fontSize = 11.sp, color = color, modifier = Modifier.width(12.dp))
         Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(k.info))
-        Text(f.path.substringAfterLast('/'), fontFamily = JetBrainsMono, fontSize = 12.sp, color = k.text, modifier = Modifier.weight(1f), maxLines = 1)
-        if (f.staged) Text("staged", fontFamily = JetBrainsMono, fontSize = 9.5f.sp, color = k.ok)
+        Text(f.path, fontFamily = JetBrainsMono, fontSize = 12.sp, color = k.text, modifier = Modifier.weight(1f), maxLines = 1)
+        if (adds > 0) Text("+$adds", fontFamily = JetBrainsMono, fontSize = 10.5f.sp, color = k.diffAddTx)
+        if (dels > 0) Text("−$dels", fontFamily = JetBrainsMono, fontSize = 10.5f.sp, color = k.diffDelTx)
     }
 }

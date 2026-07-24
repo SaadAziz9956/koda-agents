@@ -388,7 +388,9 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             DirEntry("auth.ts", "src/auth.ts", false), DirEntry("server.ts", "src/server.ts", false),
             DirEntry("lib", "src/lib", true),
         )
-        expandedDirs.add("src")
+        dirCache["src/lib"] = listOf(DirEntry("crypto.ts", "src/lib/crypto.ts", false))
+        dirCache["tests"] = listOf(DirEntry("auth.test.ts", "tests/auth.test.ts", false))
+        expandedDirs.addAll(listOf("src", "src/lib", "tests"))
         openFilePath = "src/auth.ts"
         openFileContent = """
             import { hmac, timingSafeEqual } from './crypto'

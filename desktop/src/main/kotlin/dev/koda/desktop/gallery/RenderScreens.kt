@@ -69,6 +69,10 @@ fun main(args: Array<String>) {
     render("settings-appearance", 1000, 680, dark = false) {
         dev.koda.desktop.ui.SettingsScreen(model, dark = false, onToggleTheme = {}, onClose = {}, initialTab = "appearance")
     }
+    // Right panels (344 wide), light, matching the Figma frames.
+    render("panel-rewind", 344, 620, dark = false) { dev.koda.desktop.ui.RewindPanel(model, Modifier.fillMaxSize()) }
+    render("panel-files", 344, 620, dark = false) { dev.koda.desktop.ui.FileExplorer(model) }
+    render("panel-git", 344, 620, dark = false) { dev.koda.desktop.ui.GitPanel(model, Modifier.fillMaxSize()) }
     // Rail alone, high-DPI, for close inspection of the left panel.
     render("rail", 224, 540, dark = true, density = 2f) {
         dev.koda.desktop.ui.Rail(model, AppView.Home, {}, Modifier.fillMaxSize())
