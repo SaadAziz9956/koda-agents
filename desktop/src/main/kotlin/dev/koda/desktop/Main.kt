@@ -83,6 +83,6 @@ private fun AppRoot(
 ) {
     Box(Modifier.fillMaxSize()) {
         AppShell(model, view = view, setView = setView, onOpenPalette = { setPalette(true) }, dark = dark, onToggleTheme = onToggleTheme)
-        if (palette) CommandPalette(model, onClose = { setPalette(false) }, onOpenSettings = { setView(AppView.Settings); setPalette(false) })
+        if (palette) CommandPalette(model, onClose = { setPalette(false) }, onNavigate = { setView(it); setPalette(false) })
     }
 }

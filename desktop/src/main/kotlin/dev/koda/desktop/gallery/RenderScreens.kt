@@ -58,6 +58,13 @@ fun main(args: Array<String>) {
     render("home-light", 924, 540, dark = false) {
         AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
     }
+    // ⌘K palette over Home (light), matching the Figma frame.
+    render("palette", 900, 620, dark = false) {
+        Box(Modifier.fillMaxSize()) {
+            AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
+            dev.koda.desktop.ui.CommandPalette(model, onClose = {}, onNavigate = {})
+        }
+    }
     // Settings — Appearance, light, matching the Figma frame (1000×680).
     render("settings-appearance", 1000, 680, dark = false) {
         dev.koda.desktop.ui.SettingsScreen(model, dark = false, onToggleTheme = {}, onClose = {}, initialTab = "appearance")
