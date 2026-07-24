@@ -58,6 +58,10 @@ fun main(args: Array<String>) {
     render("home-light", 924, 540, dark = false) {
         AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
     }
+    // Settings — Appearance, light, matching the Figma frame (1000×680).
+    render("settings-appearance", 1000, 680, dark = false) {
+        dev.koda.desktop.ui.SettingsScreen(model, dark = false, onToggleTheme = {}, onClose = {}, initialTab = "appearance")
+    }
     // Rail alone, high-DPI, for close inspection of the left panel.
     render("rail", 224, 540, dark = true, density = 2f) {
         dev.koda.desktop.ui.Rail(model, AppView.Home, {}, Modifier.fillMaxSize())

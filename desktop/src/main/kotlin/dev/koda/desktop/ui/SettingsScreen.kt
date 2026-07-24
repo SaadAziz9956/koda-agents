@@ -58,22 +58,24 @@ private val TAB_META = mapOf(
 )
 
 @Composable
-fun SettingsScreen(model: AppModel, dark: Boolean, onToggleTheme: () -> Unit, onClose: () -> Unit) {
+fun SettingsScreen(model: AppModel, dark: Boolean, onToggleTheme: () -> Unit, onClose: () -> Unit, initialTab: String = "connection") {
     val k = LocalKoda.current
-    var tab by remember { mutableStateOf("connection") }
+    var tab by remember { mutableStateOf(initialTab) }
     Row(Modifier.fillMaxSize().background(k.bg)) {
         // ── Nav ──
-        Column(Modifier.width(220.dp).fillMaxHeight().background(k.rail).padding(12.dp)) {
-            Text("Settings", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = k.text, modifier = Modifier.padding(start = 8.dp, bottom = 14.dp, top = 6.dp))
+        Column(
+            Modifier.width(220.dp).fillMaxHeight().background(k.rail)
+                .padding(start = 12.dp, end = 13.dp, top = 18.dp, bottom = 18.dp),
+        ) {
+            Text("Settings", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = k.text, modifier = Modifier.padding(start = 8.dp, bottom = 14.dp))
             SETTINGS_TABS.forEach { (id, label) -> NavRow(label, tab == id) { tab = id } }
-            Spacer(Modifier.weight(1f))
-            NavRow("← Close", false, onClose)
         }
+        VDivider()
         // ── Content ──
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 34.dp)) {
             Column(Modifier.widthIn(max = 620.dp)) {
                 val (title, sub) = TAB_META[tab]!!
-                Text(title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = k.text)
+                Text(title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.19).sp, color = k.text)
                 Text(sub, fontSize = 13.sp, color = k.dim, modifier = Modifier.padding(top = 4.dp, bottom = 26.dp))
                 when (tab) {
                     "connection" -> ConnectionTab(model)
@@ -194,9 +196,9 @@ private fun AppearanceTab(dark: Boolean, onToggleTheme: () -> Unit) {
     val k = LocalKoda.current
     Column {
         Text("Theme", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = k.dim, modifier = Modifier.padding(bottom = 10.dp))
-        Row(Modifier.padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ThemeCard("Ember Dark", selected = dark, bg = Color(0xFF1C1B1A), rail = Color(0xFF181716), line = Color(0xFF443F3C), accent = Color(0xFFF0663C), border = Color(0xFF322F2D)) { if (!dark) onToggleTheme() }
-            ThemeCard("Ember Light", selected = !dark, bg = Color(0xFFFBFAF9), rail = Color(0xFFEDEAE6), line = Color(0xFFC7BFB9), accent = Color(0xFFD24A22), border = Color(0xFFDAD4D0)) { if (dark) onToggleTheme() }
+        Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ThemeCard(Modifier.weight(1f), "Ember Dark", selected = dark, bg = Color(0xFF1C1B1A), rail = Color(0xFF181716), line = Color(0xFF443F3C), accent = Color(0xFFF0663C), border = Color(0xFF322F2D)) { if (!dark) onToggleTheme() }
+            ThemeCard(Modifier.weight(1f), "Ember Light", selected = !dark, bg = Color(0xFFFBFAF9), rail = Color(0xFFEDEAE6), line = Color(0xFFC7BFB9), accent = Color(0xFFD24A22), border = Color(0xFFDAD4D0)) { if (dark) onToggleTheme() }
         }
         ToggleRow("Reduce motion", "Honor system preference; disable shimmer & springs", false)
         ToggleRow("Compact density", "Tighter row heights across lists", true)
@@ -248,21 +250,22 @@ private fun GenericTab(title: String) {
 // ── Shared bits ──
 
 @Composable
-private fun ThemeCard(label: String, selected: Boolean, bg: Color, rail: Color, line: Color, accent: Color, border: Color, onClick: () -> Unit) {
+private fun ThemeCard(modifier: Modifier, label: String, selected: Boolean, bg: Color, rail: Color, line: Color, accent: Color, border: Color, onClick: () -> Unit) {
     val k = LocalKoda.current
-    val shape = RoundedCornerShape(11.dp)
+    val shape = RoundedCornerShape(12.dp)
     Column(
-        Modifier.width(150.dp).clip(shape).border(if (selected) 2.dp else 1.dp, if (selected) k.accent else k.border, shape)
-            .clickable(onClick = onClick).padding(8.dp),
+        modifier.clip(shape).border(2.dp, if (selected) k.accent else k.border, shape)
+            .clickable(onClick = onClick).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(8.dp)).background(bg).border(1.dp, border, RoundedCornerShape(8.dp)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(8.dp)).background(bg).border(1.dp, border, RoundedCornerShape(8.dp)).padding(9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.width(22.dp).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(rail))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.fillMaxWidth(0.6f).height(8.dp).clip(RoundedCornerShape(3.dp)).background(line))
                 Box(Modifier.fillMaxWidth(0.4f).height(8.dp).clip(RoundedCornerShape(3.dp)).background(accent))
             }
         }
-        Text(label, fontSize = 12.5f.sp, color = k.text, modifier = Modifier.padding(top = 9.dp))
+        Text(label, fontSize = 12.5f.sp, color = k.text)
     }
 }
 
@@ -270,14 +273,14 @@ private fun ThemeCard(label: String, selected: Boolean, bg: Color, rail: Color, 
 private fun ToggleRow(label: String, desc: String, initial: Boolean) {
     val k = LocalKoda.current
     var on by remember { mutableStateOf(initial) }
-    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    HDivider()
+    Row(Modifier.fillMaxWidth().padding(top = 15.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 13.5f.sp, color = k.text)
             Text(desc, fontSize = 12.sp, color = k.dim, modifier = Modifier.padding(top = 2.dp))
         }
         TogglePill(on) { on = !on }
     }
-    HDivider()
 }
 
 @Composable
