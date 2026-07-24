@@ -40,24 +40,24 @@ fun Rail(model: AppModel, view: AppView, onSelectView: (AppView) -> Unit, modifi
         ) {
             Eyebrow("Sessions")
             Spacer(Modifier.weight(1f))
-            Text("+ New", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { model.newSession() })
+            Text("+", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { model.newSession() }.padding(horizontal = 4.dp))
         }
         LazyColumn(
             Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             items(model.sessions, key = { it.id }) { s ->
-                SessionRow(s.id, "${s.messageCount} msgs", active = s.id == model.sessionId) { model.resume(s.id) }
+                SessionRow(s.id, s.title ?: "${s.messageCount} messages", s.messageCount, active = s.id == model.sessionId) { model.resume(s.id) }
             }
         }
         HDivider()
         Column(Modifier.padding(12.dp)) {
             Eyebrow("Surfaces", Modifier.padding(start = 8.dp, bottom = 6.dp))
-            SurfaceRow("CLI · this machine", Ember.ok)
-            SurfaceRow("WhatsApp · gateway", Ember.ok)
+            SurfaceRow("CLI", "active", Ember.ok)
+            SurfaceRow("WhatsApp", "idle", Ember.info)
             SurfaceRow(
-                "Daemon · ${model.status.name.lowercase()}",
+                "Daemon", model.status.name.lowercase(),
                 if (model.status == ConnStatus.Connected) Ember.ok else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -100,7 +100,7 @@ private fun Eyebrow(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SessionRow(name: String, meta: String, active: Boolean, onClick: () -> Unit) {
+private fun SessionRow(name: String, subtitle: String, count: Int, active: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(9.dp)
     Row(
         Modifier.fillMaxWidth().clip(shape)
@@ -108,21 +108,25 @@ private fun SessionRow(name: String, meta: String, active: Boolean, onClick: () 
             .clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Dot(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, 6.dp)
-        Spacer(Modifier.width(9.dp))
-        Text(name, fontSize = 13.sp, fontFamily = Ember.mono, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f))
+        Dot(if (active) MaterialTheme.colorScheme.primary else Ember.ok, 6.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, fontSize = 13.sp, fontFamily = Ember.mono, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, fontSize = 11.5f.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 1.dp))
+        }
         Spacer(Modifier.width(6.dp))
-        Text(meta, fontSize = 10.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$count", fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun SurfaceRow(text: String, dot: androidx.compose.ui.graphics.Color) {
+private fun SurfaceRow(name: String, meta: String, dot: androidx.compose.ui.graphics.Color) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
         Dot(dot, 7.dp)
         Spacer(Modifier.width(9.dp))
-        Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(name, fontSize = 12.5f.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Text(meta, fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -643,41 +643,40 @@ private fun Composer(model: AppModel, onOpenSettings: () -> Unit) {
             Spacer(Modifier.size(6.dp))
         }
 
-        // Clean input box — writing only.
+        // One bordered box: input on top, controls toolbar inside at the bottom
+        // — matching the handoff's single composer surface.
+        val k = LocalKoda.current
         Column(
-            Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline, shape).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().clip(shape).background(k.surface).border(1.dp, k.strong, shape),
         ) {
             if (attachments.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
                     attachments.forEach { a ->
                         Box(
-                            Modifier.clip(ChipShape).border(1.dp, MaterialTheme.colorScheme.outline, ChipShape)
+                            Modifier.clip(ChipShape).border(1.dp, k.border, ChipShape)
                                 .clickable { attachments.remove(a) }.padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
-                            Text("📎 ${a.substringAfterLast('/')}  ✕", fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${a.substringAfterLast('/')}  ✕", fontSize = 11.sp, fontFamily = Ember.mono, color = k.dim)
                         }
                     }
                 }
             }
             EmberField(
                 value = input, onValueChange = { input = it },
-                placeholder = "Message Koda…    / for commands",
-                modifier = Modifier.fillMaxWidth(), bordered = false, onSubmit = ::submit,
+                placeholder = "Ask Koda to build, fix, or explain…    /  for commands",
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp), bordered = false, onSubmit = ::submit,
             )
-        }
-        Spacer(Modifier.size(8.dp))
-        // Controls toolbar — below the input, out of the way.
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModeMenu(model)
-            ModelMenu(model)
-            AttachButton { attachments.add(it) }
-            Spacer(Modifier.weight(1f))
-            if (model.working) {
-                EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
+            Row(
+                Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 9.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ModeMenu(model)
+                ModelMenu(model)
+                Spacer(Modifier.weight(1f))
+                AttachButton { attachments.add(it) }
+                if (model.working) EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
+                EmberButton("Send  →", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
             }
-            EmberButton("Send  →", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
         }
     }
 }

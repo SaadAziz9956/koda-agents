@@ -350,8 +350,11 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
         contextLength = 200_000; usedTokens = 124_000
         working = true; activity = "Responding…"; turnStartMs = startMs - 4_700; thoughtMs = 2_000; turnOutChars = 1_192
         sessions.addAll(listOf(
-            SessionSummary("ash-7f2", 0L, 14), SessionSummary("ash-3b1", 0L, 31), SessionSummary("ash-9c4", 0L, 8),
-            SessionSummary("ash-2e8", 0L, 22), SessionSummary("ash-5a0", 0L, 5),
+            SessionSummary("ash-7f2", 0L, 14, "fix auth token compare"),
+            SessionSummary("ash-3b1", 0L, 31, "migrate to pg pool"),
+            SessionSummary("ash-9c4", 0L, 8, "refactor http client"),
+            SessionSummary("ash-2e8", 0L, 22, "add rate limiting"),
+            SessionSummary("ash-5a0", 0L, 5, "ci flakiness triage"),
         ))
         lines.add(Line.User(1, "The `auth` suite has a failing test — `verifyToken rejects valid sessions`. Find the bug and fix it."))
         val diff = """

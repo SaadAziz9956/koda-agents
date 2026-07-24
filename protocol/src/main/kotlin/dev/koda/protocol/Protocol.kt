@@ -299,6 +299,8 @@ data class SessionSummary(
     val id: String,
     val updatedAtEpochMs: Long,
     val messageCount: Int,
+    /** Optional short human title/summary of the session, if the daemon has one. */
+    val title: String? = null,
 )
 
 /** Answer to [ListMcpServers]. */
