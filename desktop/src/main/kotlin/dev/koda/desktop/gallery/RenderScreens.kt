@@ -49,8 +49,8 @@ fun main(args: Array<String>) {
     render("home", 924, 540, dark = true) {
         AppShell(model, view = AppView.Home, setView = {}, onOpenPalette = {}, dark = true, onToggleTheme = {})
     }
-    render("code", 924, 540, dark = true) {
-        AppShell(model, view = AppView.Code, setView = {}, onOpenPalette = {}, dark = true, onToggleTheme = {})
+    render("code", 1280, 812, dark = false) {
+        AppShell(model, view = AppView.Code, setView = {}, onOpenPalette = {}, dark = false, onToggleTheme = {})
     }
     render("connect", 900, 700, dark = false) {
         dev.koda.desktop.ui.ConnectScreen(model)
