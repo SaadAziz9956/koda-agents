@@ -101,6 +101,9 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     var turnStartMs by mutableStateOf(0L); private set
     var thoughtMs by mutableStateOf(0L); private set
     var turnOutChars by mutableStateOf(0); private set
+    /** Final elapsed of the last completed turn, so the activity pill can read
+     *  "Done · 8.4s" after streaming stops. */
+    var lastTurnMs by mutableStateOf(0L); private set
     private var reasoningStartMs = 0L
     private var firstTextSeen = false
 
@@ -289,6 +292,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                         add { Line.Note(it, "— resumed $sessionId (${ev.messages.size} messages) —") }
                     }
                     is TurnCompleted -> if (ev.sessionId == sessionId) {
+                        lastTurnMs = if (turnStartMs > 0) System.currentTimeMillis() - turnStartMs else 0
                         working = false; activity = null; clearStream(); refreshCheckpoints()
                     }
                     else -> {}
@@ -376,7 +380,8 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
         sessionId = "auth-fix"
         modelName = "claude-opus-4-8"; providerName = "Anthropic"; activeModel = "claude-opus-4-8"
         contextLength = 200_000; usedTokens = 124_000
-        working = true; activity = "Responding…"; turnStartMs = startMs - 4_700; thoughtMs = 2_000; turnOutChars = 1_192
+        // Reply-complete ("Done") state: pill freezes at the final elapsed.
+        working = false; activity = null; thoughtMs = 2_000; turnOutChars = 5_136; lastTurnMs = 8_400
         sessions.addAll(listOf(
             SessionSummary("ash-7f2", 0L, 14, "fix auth token compare"),
             SessionSummary("ash-3b1", 0L, 31, "migrate to pg pool"),
@@ -395,10 +400,28 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
             +  return timingSafeEqual(hashed, expected)
              }
         """.trimIndent()
+        // The edit_file card shows the fix hunk inline (expanded by default).
+        val editDiff = """
+            @@ -37,10 +37,12 @@ verifyToken
+               if (!stored) return false
+               const [ts, sig] = stored.split('.')
+            -  return raw === sig
+            -  // FIXME: rejects valid tokens
+            +  const hashed = hmac(raw, SECRET)
+            +  const expected = Buffer.from(sig, 'hex')
+            +  return timingSafeEqual(hashed, expected)
+             }
+        """.trimIndent()
         lines.add(Line.Tool(2, "read_file", "tests/auth.test.ts", ToolStatus.Ok, meta = "42 lines"))
-        lines.add(Line.Tool(3, "grep", "\"verifyToken\" src/", ToolStatus.Ok, meta = "3 matches"))
-        lines.add(Line.Tool(4, "read_file", "src/auth.ts", ToolStatus.Running, meta = "reading…"))
-        streaming = "I traced the failure to verifyToken. It was comparing the raw incoming token directly against the stored hash"
+        lines.add(Line.Tool(3, "read_file", "src/auth.ts", ToolStatus.Ok, meta = "118 lines"))
+        lines.add(Line.Tool(4, "edit_file", "src/auth.ts", ToolStatus.Ok, diff = editDiff))
+        lines.add(Line.Tool(5, "run_shell", "npm test -- auth", ToolStatus.Ok, meta = "24 passed"))
+        lines.add(Line.Assistant(6,
+            "I traced the failure to verifyToken. It was comparing the raw incoming token directly against the stored hash, so every valid session was rejected. I hashed the token first and switched to a constant-time compare, then re-ran the auth suite — all 24 tests pass.\n\n" +
+            "## What changed\n" +
+            "- Hash the incoming token before comparison in `verifyToken`\n" +
+            "- Swap `===` for `timingSafeEqual` to avoid timing leaks",
+        ))
         checkpoints.addAll(listOf(
             CheckpointInfo(3, "Ran auth suite", 0),
             CheckpointInfo(2, "Edited src/auth.ts", 1),

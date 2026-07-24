@@ -289,8 +289,9 @@ private fun Transcript(model: AppModel) {
                 else -> Box(convoAgent) { LineView(line) }
             }
         }
-        // Agent-turn header: avatar + live activity pill.
-        if (model.working) {
+        // Agent-turn header: avatar + activity pill (live "Responding…" or the
+        // frozen "Done" summary once the turn finishes).
+        if (model.working || tail.isNotEmpty()) {
             item(key = -4) {
                 Row(convo, verticalAlignment = Alignment.Top) {
                     AgentAvatar()
@@ -299,7 +300,13 @@ private fun Transcript(model: AppModel) {
                 }
             }
         }
-        items(tail, key = { it.key }) { line -> Box(convoAgent) { LineView(line) } }
+        items(tail, key = { it.key }) { line ->
+            Box(convoAgent) {
+                // The current turn's reply renders as plain markdown under the
+                // header avatar (no second avatar); tools/notes via LineView.
+                if (line is Line.Assistant) MarkdownText(line.text) else LineView(line)
+            }
+        }
         if (model.reasoning.isNotBlank()) item(key = -3) { Box(convoAgent) { ReasoningBlock(model.reasoning) } }
         if (model.streaming.isNotBlank()) item(key = -1) { Box(convoAgent) { StreamingLine(model.streaming) } }
         model.pendingApproval?.let { req -> item(key = -2) { Box(convoAgent) { ApprovalCard(req.summary) { model.approve(it) } } } }
@@ -381,13 +388,15 @@ private fun StreamingLine(text: String) {
 private fun ActivityLine(model: AppModel, text: String) {
     val k = LocalKoda.current
     val running = model.working
-    var elapsed by remember { mutableStateOf(0L) }
+    var live by remember { mutableStateOf(0L) }
     LaunchedEffect(model.turnStartMs) {
         while (model.working && model.turnStartMs > 0) {
-            elapsed = System.currentTimeMillis() - model.turnStartMs
+            live = System.currentTimeMillis() - model.turnStartMs
             kotlinx.coroutines.delay(500)
         }
     }
+    // Live elapsed while responding; the frozen final elapsed once Done.
+    val elapsed = if (running) live else model.lastTurnMs
     val tokens = model.turnOutChars / 4
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -400,10 +409,10 @@ private fun ActivityLine(model: AppModel, text: String) {
     ) {
         ActivityDot(running)
         Text(if (running) text.ifBlank { "Responding…" } else "Done", fontFamily = Ember.mono, fontSize = 12.sp, color = k.text)
-        Sep(); Text("${elapsed / 1000}s", fontFamily = Ember.mono, fontSize = 12.sp, color = k.dim)
-        Sep(); Text("↓$tokens tok", fontFamily = Ember.mono, fontSize = 12.sp, color = k.dim)
+        Sep(); Text("%.1fs".format(elapsed / 1000.0), fontFamily = Ember.mono, fontSize = 12.sp, color = k.dim)
+        Sep(); Text("↓%,d tok".format(tokens), fontFamily = Ember.mono, fontSize = 12.sp, color = k.dim)
         if (model.thoughtMs > 0) {
-            Sep(); Text("thought ${model.thoughtMs / 1000}s", fontFamily = Ember.mono, fontSize = 12.sp, color = k.faint)
+            Sep(); Text("thought %.1fs".format(model.thoughtMs / 1000.0), fontFamily = Ember.mono, fontSize = 12.sp, color = k.faint)
         }
         if (running) {
             Box(
@@ -436,7 +445,8 @@ private fun ActivityDot(running: Boolean) {
 private fun ToolCard(line: Line.Tool) {
     val k = LocalKoda.current
     val hasDiff = !line.diff.isNullOrBlank()
-    var expanded by remember(line.key) { mutableStateOf(false) }
+    // Diffs expand by default (the design shows the edit_file hunk inline).
+    var expanded by remember(line.key) { mutableStateOf(hasDiff) }
     val open = hasDiff && expanded
     val shape = if (open) RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp) else RoundedCornerShape(9.dp)
     Column(Modifier.fillMaxWidth().enterUp()) {
