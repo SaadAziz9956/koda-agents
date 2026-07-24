@@ -80,9 +80,13 @@ fun AppShell(
                 TopBar(model, onOpenPalette, onOpenSettings)
                 HDivider()
                 if (model.status != ConnStatus.Connected) ReconnectBanner(model)
-                Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
-                HDivider()
-                Composer(model, onOpenSettings)
+                if (view == AppView.Code) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) { CodeEditor(model) }
+                } else {
+                    Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
+                    HDivider()
+                    Composer(model, onOpenSettings)
+                }
             }
             if (view == AppView.Code) {
                 VDivider()
