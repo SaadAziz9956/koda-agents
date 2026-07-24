@@ -3,104 +3,139 @@ package dev.koda.desktop.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Ember — Koda's identity, applied as a skin over the Material 3 Expressive
- * engine. Warm graphite neutrals with a single vermilion accent used only as
- * the "live/active" signal; semantic colors are kept out of the accent so
- * state never fights brand. Both themes are first-class.
+ * Ember — Koda's "warm instrument, at dusk" design system, recreated from the
+ * Claude-design handoff. Full token set lives on [KodaColors] (accessible via
+ * [LocalKoda]); the Material [ColorScheme] is derived from it so existing
+ * material components stay on-palette. Geist (UI) + JetBrains Mono (machine
+ * output) are bundled in resources/font.
  */
-object Ember {
-    // dark
-    val dGround = Color(0xFF141313); val dRail = Color(0xFF181716); val dSurface = Color(0xFF1C1B1A); val dSurface2 = Color(0xFF252322)
-    val dBorder = Color(0xFF322F2D); val dBorderStrong = Color(0xFF443F3C)
-    val dText = Color(0xFFEAE6E2); val dTextDim = Color(0xFFA0968E)
-    val dAccent = Color(0xFFF0663C); val dOnAccent = Color(0xFF1B0B06)
-    // light
-    val lGround = Color(0xFFF2F0EE); val lRail = Color(0xFFEDEAE6); val lSurface = Color(0xFFFBFAF9); val lSurface2 = Color(0xFFE9E5E2)
-    val lBorder = Color(0xFFDAD4D0); val lBorderStrong = Color(0xFFC7BFB9)
-    val lText = Color(0xFF241F1C); val lTextDim = Color(0xFF665D57)
-    val lAccent = Color(0xFFD24A22); val lOnAccent = Color(0xFFFFFFFF)
-    // semantic (shared intent, tuned per theme where needed)
-    val ok = Color(0xFF84B369); val danger = Color(0xFFE0796A); val info = Color(0xFF7BA6D6)
 
-    val mono: FontFamily = FontFamily.Monospace
+// ── Fonts ───────────────────────────────────────────────────────────────────
+val Geist = FontFamily(
+    Font("font/Geist-Regular.ttf", FontWeight.Normal),
+    Font("font/Geist-Medium.ttf", FontWeight.Medium),
+    Font("font/Geist-SemiBold.ttf", FontWeight.SemiBold),
+    Font("font/Geist-Bold.ttf", FontWeight.Bold),
+)
+val JetBrainsMono = FontFamily(
+    Font("font/JetBrainsMono-Regular.ttf", FontWeight.Normal),
+    Font("font/JetBrainsMono-Medium.ttf", FontWeight.Medium),
+    Font("font/JetBrainsMono-SemiBold.ttf", FontWeight.SemiBold),
+    Font("font/JetBrainsMono-Bold.ttf", FontWeight.Bold),
+)
+
+/** Compatibility shim for existing call sites. */
+object Ember {
+    val sans: FontFamily = Geist
+    val mono: FontFamily = JetBrainsMono
+    val ok = Color(0xFF84B369)
+    val danger = Color(0xFFE0796A)
+    val info = Color(0xFF7BA6D6)
 }
 
-private val emberDark: ColorScheme = darkColorScheme(
-    primary = Ember.dAccent, onPrimary = Ember.dOnAccent,
-    secondary = Ember.dAccent, onSecondary = Ember.dOnAccent,
-    background = Ember.dGround, onBackground = Ember.dText,
-    surface = Ember.dSurface, onSurface = Ember.dText,
-    surfaceVariant = Ember.dSurface2, onSurfaceVariant = Ember.dTextDim,
-    surfaceContainerLow = Ember.dRail,
-    outline = Ember.dBorderStrong, outlineVariant = Ember.dBorder,
-    error = Ember.danger,
+// ── Token set ─────────────────────────────────────────────────────────────
+data class KodaColors(
+    val bg: Color, val rail: Color, val surface: Color, val raised: Color,
+    val border: Color, val strong: Color,
+    val text: Color, val dim: Color, val faint: Color,
+    val accent: Color, val accentSoft: Color, val onAccent: Color,
+    val ok: Color, val danger: Color, val info: Color,
+    val synKeyword: Color, val synString: Color, val synNumber: Color, val synComment: Color, val synFn: Color,
+    val diffAddBg: Color, val diffAddTx: Color, val diffDelBg: Color, val diffDelTx: Color, val hunkBg: Color,
+    val sel: Color, val glow: Color, val hi: Color,
+    val isDark: Boolean,
 )
 
-private val emberLight: ColorScheme = lightColorScheme(
-    primary = Ember.lAccent, onPrimary = Ember.lOnAccent,
-    secondary = Ember.lAccent, onSecondary = Ember.lOnAccent,
-    background = Ember.lGround, onBackground = Ember.lText,
-    surface = Ember.lSurface, onSurface = Ember.lText,
-    surfaceVariant = Ember.lSurface2, onSurfaceVariant = Ember.lTextDim,
-    surfaceContainerLow = Ember.lRail,
-    outline = Ember.lBorderStrong, outlineVariant = Ember.lBorder,
-    error = Ember.danger,
+val EmberDark = KodaColors(
+    bg = Color(0xFF141313), rail = Color(0xFF181716), surface = Color(0xFF1C1B1A), raised = Color(0xFF252322),
+    border = Color(0xFF322F2D), strong = Color(0xFF443F3C),
+    text = Color(0xFFEAE6E2), dim = Color(0xFFA0968E), faint = Color(0xFF69625C),
+    accent = Color(0xFFF0663C), accentSoft = Color(0xFFF07E5A), onAccent = Color(0xFF1B0B06),
+    ok = Color(0xFF84B369), danger = Color(0xFFE0796A), info = Color(0xFF7BA6D6),
+    synKeyword = Color(0xFF7BA6D6), synString = Color(0xFF84B369), synNumber = Color(0xFFE0A05A),
+    synComment = Color(0xFF69625C), synFn = Color(0xFFF07E5A),
+    diffAddBg = Color(0x2184B369), diffAddTx = Color(0xFFAED392),
+    diffDelBg = Color(0x21E0796A), diffDelTx = Color(0xFFE6A99F), hunkBg = Color(0x177BA6D6),
+    sel = Color(0x24F0663C), glow = Color(0x59F0663C), hi = Color(0x0BFFFFFF),
+    isDark = true,
 )
 
-/**
- * A restrained type scale for a dense pro tool: a humanist sans throughout,
- * lighter than Material's defaults, with sizes that match the Ember mockup.
- */
-private val sans = FontFamily.SansSerif
+val EmberLight = KodaColors(
+    bg = Color(0xFFF2F0EE), rail = Color(0xFFEDEAE6), surface = Color(0xFFFBFAF9), raised = Color(0xFFE9E5E2),
+    border = Color(0xFFDAD4D0), strong = Color(0xFFC7BFB9),
+    text = Color(0xFF241F1C), dim = Color(0xFF665D57), faint = Color(0xFFA79E98),
+    accent = Color(0xFFD24A22), accentSoft = Color(0xFFE0714A), onAccent = Color(0xFFFFFFFF),
+    ok = Color(0xFF84B369), danger = Color(0xFFE0796A), info = Color(0xFF7BA6D6),
+    synKeyword = Color(0xFF3F6A9A), synString = Color(0xFF4F7A34), synNumber = Color(0xFFA5702A),
+    synComment = Color(0xFFA79E98), synFn = Color(0xFFC05A30),
+    diffAddBg = Color(0x26609640), diffAddTx = Color(0xFF3F6A24),
+    diffDelBg = Color(0x21C8503C), diffDelTx = Color(0xFFA13C2C), hunkBg = Color(0x1A5A82B4),
+    sel = Color(0x1AD24A22), glow = Color(0x40D24A22), hi = Color(0xB3FFFFFF),
+    isDark = false,
+)
+
+val LocalKoda = staticCompositionLocalOf { EmberDark }
+
+private fun scheme(k: KodaColors): ColorScheme =
+    (if (k.isDark) darkColorScheme() else lightColorScheme()).copy(
+        primary = k.accent, onPrimary = k.onAccent, secondary = k.accent, onSecondary = k.onAccent,
+        background = k.bg, onBackground = k.text,
+        surface = k.surface, onSurface = k.text,
+        surfaceVariant = k.raised, onSurfaceVariant = k.dim,
+        surfaceContainerLow = k.rail,
+        outline = k.strong, outlineVariant = k.border,
+        error = k.danger,
+    )
+
 private val kodaTypography = Typography().run {
     copy(
-        titleLarge = titleLarge.copy(fontFamily = sans, fontSize = 18.sp, fontWeight = FontWeight.Bold),
-        titleMedium = titleMedium.copy(fontFamily = sans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-        bodyLarge = bodyLarge.copy(fontFamily = sans, fontSize = 14.sp, lineHeight = 21.sp),
-        bodyMedium = bodyMedium.copy(fontFamily = sans, fontSize = 13.sp),
-        labelLarge = labelLarge.copy(fontFamily = sans, fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-        labelSmall = labelSmall.copy(fontFamily = sans, fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold),
+        titleLarge = titleLarge.copy(fontFamily = Geist, fontSize = 19.sp, fontWeight = FontWeight.SemiBold),
+        titleMedium = titleMedium.copy(fontFamily = Geist, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+        bodyLarge = bodyLarge.copy(fontFamily = Geist, fontSize = 14.5.sp, lineHeight = 23.sp),
+        bodyMedium = bodyMedium.copy(fontFamily = Geist, fontSize = 13.sp),
+        labelLarge = labelLarge.copy(fontFamily = Geist, fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+        labelSmall = labelSmall.copy(fontFamily = Geist, fontSize = 11.sp, letterSpacing = 1.0.sp, fontWeight = FontWeight.Bold),
     )
 }
 
-/** Tightened shape scale — a pro instrument, not M3's default pills. */
 private val kodaShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
+    extraSmall = RoundedCornerShape(5.dp),
     small = RoundedCornerShape(8.dp),
     medium = RoundedCornerShape(11.dp),
     large = RoundedCornerShape(14.dp),
-    extraLarge = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(16.dp),
 )
 
-/**
- * Ember on Material 3. We run on the stable [MaterialTheme] because
- * `MaterialExpressiveTheme` is still an internal API in this Compose
- * Multiplatform build; the expressive motion scheme layers in unchanged once
- * that API is public (the color/shape identity here is already the target).
- */
 @Composable
 fun KodaTheme(
     dark: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (dark) emberDark else emberLight,
-        shapes = kodaShapes,
-        typography = kodaTypography,
-        content = content,
-    )
+    val k = if (dark) EmberDark else EmberLight
+    MaterialTheme(colorScheme = scheme(k), shapes = kodaShapes, typography = kodaTypography) {
+        CompositionLocalProvider(
+            LocalKoda provides k,
+            // Default any un-styled Text to Geist + on-surface, so the whole app
+            // picks up the real UI face without touching every call site.
+            LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = Geist, color = k.text),
+            content = content,
+        )
+    }
 }
