@@ -155,12 +155,14 @@ private fun NavTab(label: String, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun ContextPanel(model: AppModel, modifier: Modifier = Modifier) {
+    val k = LocalKoda.current
     var tab by remember { mutableStateOf(0) }
-    Column(modifier.background(MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.fillMaxWidth()) {
-            TabButton("Rewind", tab == 0) { tab = 0 }
-            TabButton("Files", tab == 1) { tab = 1 }
-            TabButton("Git", tab == 2) { tab = 2 }
+    Column(modifier.background(k.rail)) {
+        // 48px underline tab strip.
+        Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            TabButton("Rewind", tab == 0, Modifier.weight(1f)) { tab = 0 }
+            TabButton("Files", tab == 1, Modifier.weight(1f)) { tab = 1 }
+            TabButton("Git", tab == 2, Modifier.weight(1f)) { tab = 2 }
         }
         HDivider()
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -174,16 +176,16 @@ private fun ContextPanel(model: AppModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TabButton(label: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
+private fun TabButton(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val k = LocalKoda.current
+    Column(
+        modifier.fillMaxHeight().clickable(onClick = onClick),
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            label,
-            fontSize = 12.sp,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Spacer(Modifier.weight(1f))
+        Text(label, fontSize = 12.5f.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, color = if (active) k.text else k.dim)
+        Spacer(Modifier.weight(1f))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(if (active) k.accent else Color.Transparent))
     }
 }
 
