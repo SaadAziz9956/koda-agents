@@ -316,7 +316,7 @@ private fun UserLine(line: Line.User) {
 private fun AssistantLine(line: Line.Assistant) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         AgentAvatar()
-        Box(Modifier.weight(1f)) { MarkdownText(line.text) }
+        Box(Modifier.weight(1f).enterFade()) { MarkdownText(line.text) }
     }
 }
 
@@ -417,7 +417,7 @@ private fun ToolCard(line: Line.Tool) {
     var expanded by remember(line.key) { mutableStateOf(true) }
     val open = hasDiff && expanded
     val shape = if (open) RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp) else RoundedCornerShape(9.dp)
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().enterUp()) {
         // Head row.
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -485,7 +485,7 @@ private fun ApprovalCard(summary: String, onDecide: (ApprovalDecision) -> Unit) 
     val k = LocalKoda.current
     val shape = RoundedCornerShape(10.dp)
     Row(
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(shape)
+        Modifier.fillMaxWidth().enterUp().height(IntrinsicSize.Min).clip(shape)
             .background(k.surface).border(1.dp, k.strong, shape),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -537,7 +537,7 @@ private fun ClarifyCard(c: ClarifyRequest, model: AppModel) {
     var typing by remember(c.clarifyId) { mutableStateOf(false) }
     var custom by remember(c.clarifyId) { mutableStateOf("") }
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(k.surface).border(1.dp, k.strong, shape),
+        Modifier.fillMaxWidth().enterUp(300).clip(shape).background(k.surface).border(1.dp, k.strong, shape),
     ) {
         // Header on the hi-gradient wash.
         Column(
