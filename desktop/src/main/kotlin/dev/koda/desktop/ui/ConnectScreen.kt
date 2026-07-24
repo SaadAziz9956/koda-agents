@@ -2,6 +2,7 @@ package dev.koda.desktop.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.koda.desktop.AppModel
@@ -51,18 +54,22 @@ fun ConnectScreen(model: AppModel) {
             Column(Modifier.fillMaxWidth().padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))))
                 Spacer(Modifier.size(14.dp))
-                Text("Connect to a daemon", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = k.text)
-                Text("Koda runs on your machine. Point the app at your local agent.", fontSize = 12.5f.sp, color = k.dim, modifier = Modifier.padding(top = 4.dp))
+                Text("Connect to a daemon", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.17).sp, color = k.text)
+                Text(
+                    "Koda runs on your machine. Point the app at your local agent.",
+                    fontSize = 12.5f.sp, color = k.dim, textAlign = TextAlign.Center, lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
             Text("Daemon address", fontSize = 11.sp, color = k.dim, fontWeight = FontWeight.Medium)
             Row(
-                Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(k.bg)
-                    .border(1.dp, k.strong, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp),
+                Modifier.fillMaxWidth().padding(top = 6.dp).height(40.dp).clip(RoundedCornerShape(10.dp)).background(k.bg)
+                    .border(1.dp, k.strong, RoundedCornerShape(10.dp)).padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val alpha = blinkAlpha()
-                Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(k.accent.copy(alpha = alpha)))
-                EmberField(url, { url = it }, "ws://127.0.0.1:4477", Modifier.weight(1f).padding(vertical = 4.dp), mono = true, bordered = false, onSubmit = { model.connect(url) })
+                Box(Modifier.size(7.dp).clip(RoundedCornerShape(3.5.dp)).background(k.accent.copy(alpha = alpha)))
+                EmberField(url, { url = it }, "ws://127.0.0.1:4477", Modifier.weight(1f), mono = true, bordered = false, onSubmit = { model.connect(url) })
             }
             // Status row.
             Spacer(Modifier.size(12.dp))
@@ -74,10 +81,17 @@ fun ConnectScreen(model: AppModel) {
                 ConnStatus.Connected -> Text("Connected", fontSize = 12.sp, color = k.ok, fontFamily = JetBrainsMono)
                 ConnStatus.Disconnected -> Text("Offline — check the address and that the daemon is running.", fontSize = 12.sp, color = k.dim)
             }
-            Spacer(Modifier.size(6.dp))
-            EmberButton("Connect", onClick = { model.connect(url) }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.size(14.dp))
+            // Connect button — 40h, radius 10, accent fill, on-accent bold label.
+            Box(
+                Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp)).background(k.accent)
+                    .clickable { model.connect(url) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Connect", color = k.onAccent, fontSize = 13.5f.sp, fontWeight = FontWeight.SemiBold)
+            }
             // Recent.
-            Text("RECENT DAEMONS", fontSize = 10.5f.sp, letterSpacing = 0.9.sp, fontWeight = FontWeight.SemiBold, color = k.faint, modifier = Modifier.padding(top = 22.dp, bottom = 8.dp))
+            Text("RECENT DAEMONS", fontSize = 10.5f.sp, letterSpacing = 0.84.sp, fontWeight = FontWeight.SemiBold, color = k.faint, modifier = Modifier.padding(top = 22.dp, bottom = 6.dp))
             RecentRow(k.ok, model.daemonUrl.ifBlank { "ws://127.0.0.1:4477" }, "current") { url = model.daemonUrl }
         }
     }
