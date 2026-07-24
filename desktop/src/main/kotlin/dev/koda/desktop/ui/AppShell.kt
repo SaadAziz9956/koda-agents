@@ -46,6 +46,7 @@ import dev.koda.desktop.ConnStatus
 import dev.koda.desktop.Line
 import dev.koda.desktop.ToolStatus
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.Brush
 import dev.koda.desktop.theme.Ember
@@ -190,29 +191,29 @@ private fun ReconnectBanner(model: AppModel) {
 
 @Composable
 private fun TopBar(model: AppModel, onOpenPalette: () -> Unit, onOpenSettings: () -> Unit) {
+    val k = LocalKoda.current
     Row(
-        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().height(48.dp).background(k.bg).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Koda", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text("session ${model.sessionId}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
-            val sub = listOf(model.modelName, model.providerName).filter { it.isNotBlank() }.joinToString(" · ")
-            if (sub.isNotBlank()) Text(sub, fontSize = 11.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("koda/${model.sessionId}", fontFamily = Ember.mono, fontSize = 12.sp, color = k.text)
+        Spacer(Modifier.width(8.dp)); Text("·", color = k.faint); Spacer(Modifier.width(8.dp))
+        Text(model.activeModel.ifBlank { model.modelName }.ifBlank { "—" }, fontSize = 12.sp, color = k.dim)
+        if (model.providerName.isNotBlank()) {
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.clip(RoundedCornerShape(5.dp)).border(1.dp, k.border, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 1.dp)) {
+                Text(model.providerName, fontFamily = Ember.mono, fontSize = 10.sp, color = k.faint)
+            }
         }
         Spacer(Modifier.weight(1f))
-        if (model.working) {
-            Text("working…", fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(12.dp))
-        }
-        Chip("⌘K", onClick = onOpenPalette)
-        Spacer(Modifier.width(10.dp))
         ContextRing(model.contextPercent)
         Spacer(Modifier.width(7.dp))
-        Text(model.contextPercent?.let { "$it%" } ?: "—", fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(model.contextPercent?.let { "$it%" } ?: "—", fontSize = 12.sp, fontFamily = Ember.mono, color = k.dim)
         Spacer(Modifier.width(12.dp))
-        Chip("⚙", onClick = onOpenSettings)
+        Box(
+            Modifier.size(28.dp).clip(RoundedCornerShape(7.dp)).clickable(onClick = onOpenSettings),
+            contentAlignment = Alignment.Center,
+        ) { Icon(KIcons.gear, contentDescription = "settings", tint = k.dim, modifier = Modifier.size(15.dp)) }
     }
 }
 
@@ -242,50 +243,83 @@ private fun Transcript(model: AppModel) {
             count == 0 || last >= count - 1
         }
     }
-    LaunchedEffect(total, model.streaming, model.reasoning, model.activity) {
+    LaunchedEffect(total, model.streaming, model.reasoning, model.activity, model.pendingClarify) {
         if (total > 0 && atBottom) state.scrollToItem(total - 1)
     }
+    // Conversation column: centered, max 760, 28px gutters. Agent sub-items
+    // (tools, activity, reply, clarify, approval) indent 36px to sit under the
+    // agent avatar, matching the handoff.
+    val convo = Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(horizontal = 28.dp)
+    val convoAgent = Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(start = 64.dp, end = 28.dp)
     LazyColumn(
         state = state,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 30.dp),
-        verticalArrangement = Arrangement.spacedBy(13.dp),
-        contentPadding = PaddingValues(vertical = 22.dp),
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 26.dp, bottom = 14.dp),
     ) {
-        items(model.lines, key = { it.key }) { line -> LineView(line) }
-        if (model.reasoning.isNotBlank()) item(key = -3) { ReasoningBlock(model.reasoning) }
-        if (model.streaming.isNotBlank()) item(key = -1) { StreamingLine(model.streaming) }
-        if (model.working && model.streaming.isBlank() && model.reasoning.isBlank()) {
-            item(key = -4) { ActivityLine(model, model.activity ?: "Working…") }
+        items(model.lines, key = { it.key }) { line ->
+            when (line) {
+                is Line.User -> Box(convo) { UserLine(line) }
+                is Line.Assistant -> Box(convo) { AssistantLine(line) }
+                else -> Box(convoAgent) { LineView(line) }
+            }
         }
-        model.pendingApproval?.let { req -> item(key = -2) { ApprovalCard(req.summary) { model.approve(it) } } }
-        model.pendingClarify?.let { c -> item(key = -5) { ClarifyCard(c, model) } }
+        if (model.reasoning.isNotBlank()) item(key = -3) { Box(convoAgent) { ReasoningBlock(model.reasoning) } }
+        if (model.streaming.isNotBlank()) item(key = -1) { Box(convoAgent) { StreamingLine(model.streaming) } }
+        if (model.working && model.streaming.isBlank() && model.reasoning.isBlank()) {
+            item(key = -4) { Box(convoAgent) { ActivityLine(model, model.activity ?: "Working…") } }
+        }
+        model.pendingApproval?.let { req -> item(key = -2) { Box(convoAgent) { ApprovalCard(req.summary) { model.approve(it) } } } }
+        model.pendingClarify?.let { c -> item(key = -5) { Box(convoAgent) { ClarifyCard(c, model) } } }
+    }
+}
+
+@Composable
+private fun UserAvatar() {
+    val k = LocalKoda.current
+    Box(
+        Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(k.raised).border(1.dp, k.border, RoundedCornerShape(7.dp)),
+        contentAlignment = Alignment.Center,
+    ) { Text("JD", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = k.dim) }
+}
+
+@Composable
+private fun AgentAvatar() {
+    val k = LocalKoda.current
+    Box(
+        Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))),
+        contentAlignment = Alignment.Center,
+    ) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(3.dp)).background(k.onAccent.copy(alpha = 0.85f))) }
+}
+
+@Composable
+private fun UserLine(line: Line.User) {
+    val k = LocalKoda.current
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        UserAvatar()
+        Text(line.text, fontSize = 14.5f.sp, lineHeight = 22.sp, color = k.text, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+private fun AssistantLine(line: Line.Assistant) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        AgentAvatar()
+        Box(Modifier.weight(1f)) { MarkdownText(line.text) }
     }
 }
 
 @Composable
 private fun LineView(line: Line) {
     when (line) {
-        is Line.User -> Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                .padding(13.dp),
-        ) {
-            Text("YOU", fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.size(6.dp))
-            Text(line.text, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-        }
-        is Line.Assistant -> Column(Modifier.fillMaxWidth()) {
-            Text("KODA", fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.size(6.dp))
-            MarkdownText(line.text)
-        }
         is Line.Tool -> ToolCard(line)
         is Line.Note -> Text(
             line.text,
             color = if (line.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             fontFamily = Ember.mono, fontSize = 12.sp,
         )
+        else -> {}
     }
 }
 
