@@ -337,4 +337,74 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     fun refreshSchedules() { scope.launch { client.submit(ListSchedules(id(), sessionId)) } }
     fun createSchedule(prompt: String, everySeconds: Long) { scope.launch { client.submit(CreateSchedule(id(), sessionId, prompt, everySeconds)) } }
     fun cancelSchedule(scheduleId: String) { scope.launch { client.submit(CancelSchedule(id(), sessionId, scheduleId)) } }
+
+    /**
+     * Preview/render only — seed observable state with sample data so the UI can
+     * be rendered offscreen (see :desktop:renderScreens) without a live daemon.
+     * Never called in the running app.
+     */
+    internal fun previewSeed(startMs: Long) {
+        status = ConnStatus.Connected; everConnected = true
+        sessionId = "auth-fix"
+        modelName = "claude-opus-4-8"; providerName = "Anthropic"; activeModel = "claude-opus-4-8"
+        contextLength = 200_000; usedTokens = 124_000
+        working = true; activity = "Responding…"; turnStartMs = startMs - 4_700; thoughtMs = 2_000; turnOutChars = 1_192
+        sessions.addAll(listOf(
+            SessionSummary("ash-7f2", 0L, 14), SessionSummary("ash-3b1", 0L, 31), SessionSummary("ash-9c4", 0L, 8),
+            SessionSummary("ash-2e8", 0L, 22), SessionSummary("ash-5a0", 0L, 5),
+        ))
+        lines.add(Line.User(1, "The `auth` suite has a failing test — `verifyToken rejects valid sessions`. Find the bug and fix it."))
+        val diff = """
+            @@ -11,4 +11,6 @@ verifyToken
+               if (!stored) return false
+               const [ts, sig] = stored.split('.')
+            -  return raw === sig
+            +  const hashed = hmac(raw, SECRET)
+            +  const expected = Buffer.from(sig, 'hex')
+            +  return timingSafeEqual(hashed, expected)
+             }
+        """.trimIndent()
+        lines.add(Line.Tool(2, "read_file", "tests/auth.test.ts", ToolStatus.Ok))
+        lines.add(Line.Tool(3, "grep", "\"verifyToken\"", ToolStatus.Ok))
+        lines.add(Line.Tool(4, "read_file", "src/auth.ts", ToolStatus.Ok))
+        lines.add(Line.Tool(5, "edit_file", "src/auth.ts", ToolStatus.Ok, diff))
+        checkpoints.addAll(listOf(
+            CheckpointInfo(3, "Ran auth suite", 0),
+            CheckpointInfo(2, "Edited src/auth.ts", 1),
+            CheckpointInfo(1, "Read auth files", 3),
+        ))
+        gitOk = true; gitBranch = "fix/auth-token-compare"; gitAhead = 1
+        gitFiles.add(GitFileChange("src/auth.ts", "modified", false))
+        gitDiff = diff; gitDiffPath = "src/auth.ts"
+        dirCache[""] = listOf(
+            DirEntry("src", "src", true), DirEntry("tests", "tests", true),
+            DirEntry("package.json", "package.json", false), DirEntry("README.md", "README.md", false),
+            DirEntry(".env", ".env", false),
+        )
+        dirCache["src"] = listOf(
+            DirEntry("auth.ts", "src/auth.ts", false), DirEntry("server.ts", "src/server.ts", false),
+            DirEntry("lib", "src/lib", true),
+        )
+        expandedDirs.add("src")
+        openFilePath = "src/auth.ts"
+        openFileContent = """
+            import { hmac, timingSafeEqual } from './crypto'
+            import { SECRET } from './config'
+
+            export interface Session {
+              user: string
+              issued: number
+            }
+
+            // Verify a signed session token against the store
+            export function verifyToken(raw: string, stored: string) {
+              if (!stored) return false
+              const [ts, sig] = stored.split('.')
+              const hashed = hmac(raw, SECRET)
+              const expected = Buffer.from(sig, 'hex')
+              return timingSafeEqual(hashed, expected)
+            }
+        """.trimIndent()
+        availableModels.addAll(listOf("claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"))
+    }
 }

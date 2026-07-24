@@ -68,7 +68,7 @@ fun RewindPanel(model: AppModel, modifier: Modifier = Modifier) {
 @Composable
 private fun CheckpointRow(cp: CheckpointInfo, isFirst: Boolean, isLast: Boolean, onRewind: () -> Unit) {
     val k = LocalKoda.current
-    val now = cp.index == 1 || isFirst
+    val now = isFirst
     val dotColor = when {
         now -> k.accent
         cp.fileCount > 0 -> k.ok

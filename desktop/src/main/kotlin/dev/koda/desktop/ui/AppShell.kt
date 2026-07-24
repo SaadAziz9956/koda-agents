@@ -68,8 +68,9 @@ fun AppShell(
     onOpenSettings: () -> Unit,
     dark: Boolean,
     onToggleTheme: () -> Unit,
+    initialView: AppView = AppView.Code,
 ) {
-    var view by remember { mutableStateOf(AppView.Code) }
+    var view by remember { mutableStateOf(initialView) }
     val k = LocalKoda.current
     Column(Modifier.fillMaxSize().background(k.bg)) {
         TopReviewNav(view, { view = it }, onOpenPalette, onOpenSettings, dark, onToggleTheme)
@@ -414,7 +415,7 @@ private fun ActivityDot(running: Boolean) {
 private fun ToolCard(line: Line.Tool) {
     val k = LocalKoda.current
     val hasDiff = !line.diff.isNullOrBlank()
-    var expanded by remember(line.key) { mutableStateOf(true) }
+    var expanded by remember(line.key) { mutableStateOf(false) }
     val open = hasDiff && expanded
     val shape = if (open) RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp) else RoundedCornerShape(9.dp)
     Column(Modifier.fillMaxWidth().enterUp()) {
@@ -676,7 +677,7 @@ private fun Composer(model: AppModel, onOpenSettings: () -> Unit) {
             if (model.working) {
                 EmberGhostButton("Stop", onClick = { model.interrupt() }, danger = true)
             }
-            EmberButton("Send", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
+            EmberButton("Send  →", onClick = ::submit, enabled = input.isNotBlank() || attachments.isNotEmpty())
         }
     }
 }

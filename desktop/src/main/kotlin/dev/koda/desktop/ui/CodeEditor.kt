@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +55,22 @@ private val KEYWORDS = setOf(
 private val HL = Regex(
     """("[^"]*"|'[^']*'|`[^`]*`)|\b([A-Za-z_]\w*)\b|\b(\d[\d._]*)\b|\b([A-Za-z_]\w*)(?=\()""",
 )
+
+/** New-file line numbers that a unified diff adds — used for change markers. */
+private fun changedLines(diff: String): Set<Int> {
+    val out = HashSet<Int>()
+    var n = 0
+    for (line in diff.lines()) {
+        when {
+            line.startsWith("@@") -> Regex("""\+([0-9]+)""").find(line)?.let { n = it.groupValues[1].toInt() }
+            line.startsWith("+++") -> {}
+            line.startsWith("+") -> out.add(n++)
+            line.startsWith("-") -> {}
+            else -> n++
+        }
+    }
+    return out
+}
 
 /** Highlight a single source line into a colored [AnnotatedString]. */
 private fun highlight(line: String, k: KodaColors): AnnotatedString = buildAnnotatedString {
@@ -124,17 +141,25 @@ fun CodeEditor(model: AppModel, modifier: Modifier = Modifier) {
             }
         } else {
             val lines = model.openFileContent.split('\n')
+            // Mark lines the agent just changed, from the git diff for this file.
+            val changed = remember(model.gitDiff, model.gitDiffPath, path) {
+                if (model.gitDiffPath == path && model.gitDiff.isNotBlank()) changedLines(model.gitDiff) else emptySet()
+            }
             val h = rememberScrollState()
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
                 Column(Modifier.horizontalScroll(h)) {
                     lines.forEachIndexed { i, line ->
-                        Row(Modifier.padding(horizontal = 8.dp)) {
+                        val isChanged = changed.contains(i + 1)
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                                .background(if (isChanged) k.diffAddBg else androidx.compose.ui.graphics.Color.Transparent),
+                        ) {
                             Text(
                                 "${i + 1}", fontFamily = JetBrainsMono, fontSize = 12.5f.sp, color = k.faint,
                                 textAlign = TextAlign.End, modifier = Modifier.width(44.dp).padding(end = 16.dp),
                             )
                             Text(
-                                "", fontFamily = JetBrainsMono, fontSize = 12.5f.sp, color = k.accent,
+                                if (isChanged) "▸" else "", fontFamily = JetBrainsMono, fontSize = 11.sp, color = k.accent,
                                 textAlign = TextAlign.Center, modifier = Modifier.width(14.dp),
                             )
                             Text(
