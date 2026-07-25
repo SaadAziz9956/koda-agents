@@ -69,6 +69,9 @@ fun main(args: Array<String>) {
     render("settings-appearance", 1000, 680, dark = false) {
         dev.koda.desktop.ui.SettingsScreen(model, dark = false, onToggleTheme = {}, onClose = {}, initialTab = "appearance")
     }
+    render("settings-connection", 1000, 680, dark = false) {
+        dev.koda.desktop.ui.SettingsScreen(model, dark = false, onToggleTheme = {}, onClose = {}, initialTab = "connection")
+    }
     // Right panels (344 wide), light, matching the Figma frames.
     render("panel-rewind", 344, 620, dark = false) { dev.koda.desktop.ui.RewindPanel(model, Modifier.fillMaxSize()) }
     render("panel-files", 344, 620, dark = false) { dev.koda.desktop.ui.FileExplorer(model) }

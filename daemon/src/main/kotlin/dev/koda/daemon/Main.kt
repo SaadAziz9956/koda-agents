@@ -29,8 +29,9 @@ import kotlinx.coroutines.launch
 fun main(args: Array<String>) {
     val port = args.getOrNull(args.indexOf("--port") + 1)?.toIntOrNull()?.takeIf { "--port" in args } ?: 4477
 
-    val apiKey = System.getenv("ANTHROPIC_API_KEY")
-        ?: error("ANTHROPIC_API_KEY is not set")
+    // The key is optional at startup — it can be set from any surface (the
+    // desktop's Connect Anthropic flow) and is stored at ~/.koda/credentials.json.
+    val apiKey = System.getenv("ANTHROPIC_API_KEY").orEmpty()
 
     val config = KodaConfig(
         provider = ProviderConfig(

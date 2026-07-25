@@ -6,6 +6,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.koda.protocol.ApprovalDecision
+import dev.koda.protocol.AuthStatus
+import dev.koda.protocol.GetAuthStatus
+import dev.koda.protocol.SetApiKey
+import dev.koda.protocol.SignOut
 import dev.koda.protocol.ClarifyRequest
 import dev.koda.protocol.ClarifyResponse
 import dev.koda.protocol.CreatePr
@@ -133,6 +137,12 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
     val availableModels = mutableStateListOf<String>()
     var activeModel by mutableStateOf(""); private set
 
+    // Anthropic auth (bring-your-own key), set from the app.
+    var authConfigured by mutableStateOf(false); private set
+    var authLabel by mutableStateOf(""); private set
+    var authError by mutableStateOf<String?>(null); private set
+    var authChecking by mutableStateOf(false); private set
+
     val contextPercent: Int?
         get() = if (contextLength > 0 && usedTokens > 0) ((usedTokens * 100) / contextLength).toInt().coerceAtMost(100) else null
 
@@ -223,6 +233,7 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                 everConnected = true
                 refreshSessions(); refreshCheckpoints(); loadDir(""); refreshGit(); refreshSchedules()
                 scope.launch { client.submit(ListModels(id(), sessionId)) }
+                scope.launch { client.submit(GetAuthStatus(id(), sessionId)) }
             }
         }
         scope.launch {
@@ -279,6 +290,12 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
                     is GitDiff -> { gitDiff = ev.unified; gitDiffPath = ev.path }
                     is ScheduleList -> { schedules.clear(); schedules.addAll(ev.schedules) }
                     is ModelList -> { availableModels.clear(); availableModels.addAll(ev.models); activeModel = ev.current }
+                    is AuthStatus -> {
+                        authChecking = false
+                        authConfigured = ev.configured
+                        authLabel = ev.label
+                        authError = ev.error
+                    }
                     is GitCommitResult -> { add { Line.Note(it, "git: ${ev.message}", error = !ev.ok) }; refreshGit() }
                     is PrResult -> add { Line.Note(it, "PR: ${ev.message}", error = !ev.ok) }
                     is CheckpointList -> if (ev.sessionId == sessionId) { checkpoints.clear(); checkpoints.addAll(ev.checkpoints) }
@@ -315,6 +332,16 @@ class AppModel(private val client: DaemonClient, private val scope: CoroutineSco
         working = true
         scope.launch { client.submit(ReviewRequest(id(), sessionId, target)) }
     }
+
+    /** Send an Anthropic key to the daemon; it validates + persists, then pushes AuthStatus. */
+    fun setApiKey(key: String) {
+        if (key.isBlank()) return
+        authChecking = true; authError = null
+        scope.launch { client.submit(SetApiKey(id(), sessionId, "anthropic", key.trim())) }
+    }
+
+    fun signOut() { scope.launch { client.submit(SignOut(id(), sessionId)) } }
+    fun refreshAuth() { scope.launch { client.submit(GetAuthStatus(id(), sessionId)) } }
 
     fun setModelId(modelId: String) {
         if (modelId.isNotBlank()) { activeModel = modelId; scope.launch { client.submit(SetModel(id(), sessionId, modelId)) } }

@@ -14,4 +14,7 @@ dependencies {
     api(libs.koog.agents.mcp)
     api(libs.coroutines.core)
     implementation(libs.serialization.json)
+    // Ktor client for the per-request API-key injector + key validation.
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
 }

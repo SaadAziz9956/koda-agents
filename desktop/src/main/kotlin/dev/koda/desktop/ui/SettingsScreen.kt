@@ -123,9 +123,53 @@ private fun ConnectionTab(model: AppModel) {
             Text(model.status.name, fontSize = 13.sp, color = k.text, modifier = Modifier.weight(1f))
             Text(model.daemonUrl, fontFamily = JetBrainsMono, fontSize = 11.sp, color = k.dim)
         }
+
+        // ── Anthropic account (bring-your-own key) ──
+        HDivider()
+        AnthropicAccount(model)
+
         ToggleRow("Auto-reconnect", "Silently retry if the daemon drops", true)
         ToggleRow("Trust local network daemons", "Skip confirmation for 127.0.0.1", false)
     }
+}
+
+@Composable
+private fun AnthropicAccount(model: AppModel) {
+    val k = LocalKoda.current
+    var key by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Anthropic account", fontSize = 12.sp, color = k.dim, fontWeight = FontWeight.Medium)
+        if (model.authConfigured) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(k.surface).border(1.dp, k.border, RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(k.ok))
+                Text("Connected", fontSize = 13.sp, color = k.text)
+                Text(model.authLabel, fontFamily = JetBrainsMono, fontSize = 11.sp, color = k.dim, modifier = Modifier.weight(1f))
+                Box(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, k.border, RoundedCornerShape(7.dp)).clickable { model.signOut() }.padding(horizontal = 10.dp, vertical = 5.dp)) {
+                    Text("Sign out", fontSize = 12.sp, color = k.dim)
+                }
+            }
+        } else {
+            Text("Paste an Anthropic API key. Koda validates it, then stores it on the daemon (~/.koda, owner-only).", fontSize = 12.sp, color = k.dim, lineHeight = 17.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                EmberField(key, { key = it }, "sk-ant-…", Modifier.weight(1f), mono = true, onSubmit = { model.setApiKey(key) })
+                EmberButton(if (model.authChecking) "Checking…" else "Connect", onClick = { model.setApiKey(key) }, enabled = key.isNotBlank() && !model.authChecking)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.clip(RoundedCornerShape(7.dp)).clickable { openUrl("https://console.anthropic.com/settings/keys") }.padding(vertical = 2.dp)) {
+                    Text("Get a key ↗", fontSize = 12.sp, color = k.accent)
+                }
+                if (model.authError != null) Text("· ${model.authError}", fontSize = 12.sp, color = k.danger)
+            }
+        }
+    }
+}
+
+/** Open a URL in the user's default browser (desktop only). */
+private fun openUrl(url: String) {
+    runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
 }
 
 @Composable

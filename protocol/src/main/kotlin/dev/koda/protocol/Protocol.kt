@@ -595,3 +595,42 @@ data class ErrorEvent(
     override val sessionId: String,
     val message: String,
 ) : Event
+
+// ── Auth (bring-your-own API key) ───────────────────────────────────────────
+
+/** Set the provider API key on the daemon; it validates, then persists it. */
+@Serializable
+@SerialName("set_api_key")
+data class SetApiKey(
+    override val id: String,
+    override val sessionId: String,
+    val provider: String = "anthropic",
+    val key: String,
+) : Submission
+
+/** Ask the daemon for the current auth state. */
+@Serializable
+@SerialName("get_auth_status")
+data class GetAuthStatus(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
+/** Clear the stored key. */
+@Serializable
+@SerialName("sign_out")
+data class SignOut(
+    override val id: String,
+    override val sessionId: String,
+) : Submission
+
+/** Current auth state, pushed after set/get/sign-out (never carries the key). */
+@Serializable
+@SerialName("auth_status")
+data class AuthStatus(
+    override val sessionId: String,
+    val configured: Boolean,
+    val provider: String = "anthropic",
+    val label: String = "",
+    val error: String? = null,
+) : Event

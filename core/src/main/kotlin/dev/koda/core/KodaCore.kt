@@ -78,6 +78,8 @@ class KodaCore(
     private val repository: SessionRepository,
     private val permissionPolicyFactory: () -> PermissionPolicy =
         { ModePermissionPolicy(config.permissionMode) },
+    private val apiKeyHolder: dev.koda.core.engine.ApiKeyHolder = dev.koda.core.engine.ApiKeyHolder(),
+    private val authStore: dev.koda.core.engine.AuthStore = dev.koda.core.engine.AuthStore(config.kodaHome),
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -301,9 +303,35 @@ class KodaCore(
                             PermissionModeSetting.PLAN -> PermissionMode.PLAN
                         }
                     )
+                is dev.koda.protocol.SetApiKey -> handleSetApiKey(submission)
+                is dev.koda.protocol.GetAuthStatus -> _events.emit(authStatusEvent(submission.sessionId))
+                is dev.koda.protocol.SignOut -> {
+                    authStore.clear(); apiKeyHolder.key = null; authLabel = ""
+                    _events.emit(authStatusEvent(submission.sessionId))
+                }
             }
         }
     }
+
+    // ── Auth ──────────────────────────────────────────────────────────────
+    @Volatile private var authLabel: String = ""
+
+    /** Validate a submitted key; on success stamp the live holder + persist it. */
+    private suspend fun handleSetApiKey(sub: dev.koda.protocol.SetApiKey) {
+        val check = dev.koda.core.engine.validateAnthropicKey(sub.key)
+        if (check.ok) {
+            apiKeyHolder.key = sub.key
+            authStore.saveAnthropicKey(sub.key)
+            authLabel = check.label
+            _events.emit(dev.koda.protocol.AuthStatus(sub.sessionId, configured = true, label = check.label))
+        } else {
+            _events.emit(dev.koda.protocol.AuthStatus(sub.sessionId, configured = false, label = authLabel, error = check.error))
+        }
+    }
+
+    private fun authStatusEvent(sessionId: String) = dev.koda.protocol.AuthStatus(
+        sessionId, configured = !apiKeyHolder.key.isNullOrBlank(), label = authLabel,
+    )
 
     suspend fun submit(submission: Submission) = submissions.send(submission)
 
@@ -479,34 +507,51 @@ class KodaCore(
         /** Default composition root: Koog executor per provider, file persistence, default tools. */
         fun create(config: KodaConfig): KodaCore {
             val model = buildModel(config)
+            // The live key comes from the store, then env/config, then unset —
+            // it's injected per-request, so it can be set from the app later.
+            val authStore = dev.koda.core.engine.AuthStore(config.kodaHome)
+            val holder = dev.koda.core.engine.ApiKeyHolder(
+                authStore.loadAnthropicKey() ?: config.provider.apiKey.ifBlank { null },
+            )
             return KodaCore(
                 config = config,
-                executor = buildExecutor(config.provider, model),
+                executor = buildExecutor(config.provider, model, holder),
                 model = model,
                 repository = PromptFileSessionRepository(config.sessionsDir),
+                apiKeyHolder = holder,
+                authStore = authStore,
             )
         }
 
-        private fun buildExecutor(provider: ProviderConfig, model: LLModel): PromptExecutor {
-            val httpFactory = KtorKoogHttpClient.Factory()
+        private fun buildExecutor(
+            provider: ProviderConfig,
+            model: LLModel,
+            holder: dev.koda.core.engine.ApiKeyHolder,
+        ): PromptExecutor {
             return when (provider.apiShape) {
-                ApiShape.ANTHROPIC_MESSAGES -> MultiLLMPromptExecutor(
-                    AnthropicLLMClient(
-                        apiKey = provider.apiKey,
-                        // The client resolves the wire model id through this map;
-                        // include the active model so custom ids work too.
-                        settings = AnthropicClientSettings(
-                            modelVersionsMap = ANTHROPIC_CATALOG.associateWith { it.id } +
-                                (model to model.id),
-                        ),
-                        httpClientFactory = httpFactory,
+                ApiShape.ANTHROPIC_MESSAGES -> {
+                    // Base Ktor client stamps the holder's current key onto every
+                    // request; the client's own apiKey is a placeholder that the
+                    // plugin overwrites. Setting a key at runtime takes effect at once.
+                    val base = io.ktor.client.HttpClient(io.ktor.client.engine.cio.CIO) {
+                        install(dev.koda.core.engine.apiKeyPlugin(holder))
+                    }
+                    MultiLLMPromptExecutor(
+                        AnthropicLLMClient(
+                            apiKey = provider.apiKey.ifBlank { "koda-unset" },
+                            settings = AnthropicClientSettings(
+                                modelVersionsMap = ANTHROPIC_CATALOG.associateWith { it.id } +
+                                    (model to model.id),
+                            ),
+                            httpClientFactory = KtorKoogHttpClient.Factory(base, true),
+                        )
                     )
-                )
+                }
                 ApiShape.OPENAI_CHAT_COMPLETIONS -> MultiLLMPromptExecutor(
                     OpenAILLMClient(
                         apiKey = provider.apiKey,
                         settings = OpenAIClientSettings(baseUrl = provider.baseUrl),
-                        httpClientFactory = httpFactory,
+                        httpClientFactory = KtorKoogHttpClient.Factory(),
                     )
                 )
             }
