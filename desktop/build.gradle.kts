@@ -14,10 +14,9 @@ dependencies {
     implementation(project(":protocol"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
-    // Eva Icons (+ Feather for the git-branch glyph Eva lacks) — open-source
-    // icon packs for Compose Multiplatform.
-    implementation("br.com.devsrsouza.compose.icons:eva-icons:1.1.1")
-    implementation("br.com.devsrsouza.compose.icons:feather:1.1.1")
+    // Phosphor icons (Bold weight) — technical, thicker-stroke set for the
+    // minimalist-editorial system.
+    implementation("com.adamglin:phosphor-icon:1.0.0")
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.ktor.client.core)
