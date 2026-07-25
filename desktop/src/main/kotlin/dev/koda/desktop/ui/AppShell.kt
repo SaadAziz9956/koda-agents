@@ -208,27 +208,41 @@ private fun ReconnectBanner(model: AppModel) {
     }
 }
 
-/** Shown across Home/Code when the daemon has no Anthropic key yet — connect
- *  right here (paste key → validate) without diving into Settings. */
+/** Shown across Home/Code when the daemon has no Anthropic key yet — a compact
+ *  card to connect right here (paste key → validate) without opening Settings. */
 @Composable
 private fun AuthBanner(model: AppModel) {
     val k = LocalKoda.current
     var key by remember { mutableStateOf("") }
-    Column(
-        Modifier.fillMaxWidth().background(k.sel).padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Connect your Anthropic account to start.", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = k.text)
-            Box(Modifier.clip(RoundedCornerShape(6.dp)).clickable { openUrl("https://console.anthropic.com/settings/keys") }.padding(horizontal = 2.dp)) {
-                Text("Get a key ↗", fontSize = 12.5f.sp, color = k.accent)
+    val shape = RoundedCornerShape(13.dp)
+    Box(Modifier.fillMaxWidth().background(k.rail).padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(
+            Modifier.widthIn(max = 720.dp).fillMaxWidth().clip(shape).background(k.surface)
+                .border(1.dp, k.strong, shape).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Gradient logo tile with a key glyph, matching the Connect card.
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))),
+                    contentAlignment = Alignment.Center,
+                ) { Text("⚿", fontSize = 17.sp, color = k.onAccent) }
+                Column(Modifier.weight(1f)) {
+                    Text("Connect your Anthropic account", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = k.text)
+                    Text("Paste an API key to start — Koda validates it and stores it locally.", fontSize = 12.5f.sp, color = k.dim, modifier = Modifier.padding(top = 1.dp))
+                }
+                Box(Modifier.clip(RoundedCornerShape(7.dp)).clickable { openUrl("https://console.anthropic.com/settings/keys") }.padding(horizontal = 8.dp, vertical = 5.dp)) {
+                    Text("Get a key ↗", fontSize = 12.5f.sp, fontWeight = FontWeight.Medium, color = k.accent)
+                }
             }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(k.bg).border(1.dp, k.border, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 2.dp)) {
+                    EmberField(key, { key = it }, "sk-ant-…", Modifier.fillMaxWidth(), mono = true, bordered = false, onSubmit = { model.setApiKey(key) })
+                }
+                EmberButton(if (model.authChecking) "Checking…" else "Connect", onClick = { model.setApiKey(key) }, enabled = key.isNotBlank() && !model.authChecking)
+            }
+            model.authError?.let { Text(it, fontSize = 12.sp, color = k.danger) }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            EmberField(key, { key = it }, "sk-ant-…", Modifier.weight(1f), mono = true, onSubmit = { model.setApiKey(key) })
-            EmberButton(if (model.authChecking) "Checking…" else "Connect", onClick = { model.setApiKey(key) }, enabled = key.isNotBlank() && !model.authChecking)
-        }
-        model.authError?.let { Text(it, fontSize = 12.sp, color = k.danger) }
     }
 }
 
