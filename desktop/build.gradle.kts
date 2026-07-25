@@ -14,7 +14,9 @@ dependencies {
     implementation(project(":protocol"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
-    // Feather — open-source thin line icons for Compose Multiplatform.
+    // Eva Icons (+ Feather for the git-branch glyph Eva lacks) — open-source
+    // icon packs for Compose Multiplatform.
+    implementation("br.com.devsrsouza.compose.icons:eva-icons:1.1.1")
     implementation("br.com.devsrsouza.compose.icons:feather:1.1.1")
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
