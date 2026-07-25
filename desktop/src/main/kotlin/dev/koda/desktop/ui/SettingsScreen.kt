@@ -168,7 +168,7 @@ private fun AnthropicAccount(model: AppModel) {
 }
 
 /** Open a URL in the user's default browser (desktop only). */
-private fun openUrl(url: String) {
+internal fun openUrl(url: String) {
     runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
 }
 

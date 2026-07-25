@@ -86,6 +86,7 @@ fun AppShell(
                         TopBar(model, onOpenPalette, onOpenSettings = { setView(AppView.Settings) })
                         HDivider()
                         if (model.status != ConnStatus.Connected) ReconnectBanner(model)
+                        if (model.everConnected && !model.authConfigured) AuthBanner(model)
                         if (view == AppView.Code) {
                             Box(Modifier.weight(1f).fillMaxWidth()) { CodeEditor(model) }
                         } else {
@@ -204,6 +205,30 @@ private fun ReconnectBanner(model: AppModel) {
             if (model.status == ConnStatus.Connecting) "reconnecting to ${model.daemonUrl}…" else "disconnected — retrying ${model.daemonUrl}",
             fontSize = 12.sp, fontFamily = Ember.mono, color = MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+/** Shown across Home/Code when the daemon has no Anthropic key yet — connect
+ *  right here (paste key → validate) without diving into Settings. */
+@Composable
+private fun AuthBanner(model: AppModel) {
+    val k = LocalKoda.current
+    var key by remember { mutableStateOf("") }
+    Column(
+        Modifier.fillMaxWidth().background(k.sel).padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Connect your Anthropic account to start.", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = k.text)
+            Box(Modifier.clip(RoundedCornerShape(6.dp)).clickable { openUrl("https://console.anthropic.com/settings/keys") }.padding(horizontal = 2.dp)) {
+                Text("Get a key ↗", fontSize = 12.5f.sp, color = k.accent)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            EmberField(key, { key = it }, "sk-ant-…", Modifier.weight(1f), mono = true, onSubmit = { model.setApiKey(key) })
+            EmberButton(if (model.authChecking) "Checking…" else "Connect", onClick = { model.setApiKey(key) }, enabled = key.isNotBlank() && !model.authChecking)
+        }
+        model.authError?.let { Text(it, fontSize = 12.sp, color = k.danger) }
     }
 }
 
