@@ -54,7 +54,7 @@ fun ConnectScreen(model: AppModel) {
             Column(Modifier.fillMaxWidth().padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(k.accent))
                 Spacer(Modifier.size(14.dp))
-                Text("Connect to a daemon", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.17).sp, color = k.text)
+                Text("Connect to a daemon", fontFamily = dev.koda.desktop.theme.InstrumentSerif, fontSize = 23.sp, letterSpacing = (-0.4).sp, color = k.text)
                 Text(
                     "Koda runs on your machine. Point the app at your local agent.",
                     fontSize = 12.5f.sp, color = k.dim, textAlign = TextAlign.Center, lineHeight = 17.sp,

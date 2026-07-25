@@ -75,7 +75,7 @@ fun SettingsScreen(model: AppModel, dark: Boolean, onToggleTheme: () -> Unit, on
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 34.dp)) {
             Column(Modifier.widthIn(max = 620.dp)) {
                 val (title, sub) = TAB_META[tab]!!
-                Text(title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.19).sp, color = k.text)
+                Text(title, fontFamily = dev.koda.desktop.theme.InstrumentSerif, fontSize = 26.sp, letterSpacing = (-0.4).sp, color = k.text)
                 Text(sub, fontSize = 13.sp, color = k.dim, modifier = Modifier.padding(top = 4.dp, bottom = 26.dp))
                 when (tab) {
                     "connection" -> ConnectionTab(model)

@@ -41,10 +41,17 @@ val JetBrainsMono = FontFamily(
     Font("font/JetBrainsMono-Bold.ttf", FontWeight.Bold),
 )
 
+/** Editorial serif for hero/display headings (minimalist-editorial system). */
+val InstrumentSerif = FontFamily(
+    Font("font/InstrumentSerif-Regular.ttf", FontWeight.Normal),
+    Font("font/InstrumentSerif-Italic.ttf", FontWeight.Normal, androidx.compose.ui.text.font.FontStyle.Italic),
+)
+
 /** Compatibility shim for existing call sites. */
 object Ember {
     val sans: FontFamily = Geist
     val mono: FontFamily = JetBrainsMono
+    val serif: FontFamily = InstrumentSerif
     val ok = Color(0xFF4E8A4E)
     val danger = Color(0xFFB0463F)
     val info = Color(0xFF3E7BB0)
