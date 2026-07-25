@@ -45,9 +45,9 @@ val JetBrainsMono = FontFamily(
 object Ember {
     val sans: FontFamily = Geist
     val mono: FontFamily = JetBrainsMono
-    val ok = Color(0xFF84B369)
-    val danger = Color(0xFFE0796A)
-    val info = Color(0xFF7BA6D6)
+    val ok = Color(0xFF4E8A4E)
+    val danger = Color(0xFFB0463F)
+    val info = Color(0xFF3E7BB0)
 }
 
 // ── Token set ─────────────────────────────────────────────────────────────
@@ -63,35 +63,41 @@ data class KodaColors(
     val isDark: Boolean,
 )
 
-val EmberDark = KodaColors(
-    bg = Color(0xFF141313), rail = Color(0xFF181716), surface = Color(0xFF1C1B1A), raised = Color(0xFF252322),
-    border = Color(0xFF322F2D), strong = Color(0xFF443F3C),
-    text = Color(0xFFEAE6E2), dim = Color(0xFFA0968E), faint = Color(0xFF69625C),
-    accent = Color(0xFFF0663C), accentSoft = Color(0xFFF07E5A), onAccent = Color(0xFF1B0B06),
-    ok = Color(0xFF84B369), danger = Color(0xFFE0796A), info = Color(0xFF7BA6D6),
-    synKeyword = Color(0xFF7BA6D6), synString = Color(0xFF84B369), synNumber = Color(0xFFE0A05A),
-    synComment = Color(0xFF69625C), synFn = Color(0xFFF07E5A),
-    diffAddBg = Color(0x2184B369), diffAddTx = Color(0xFFAED392),
-    diffDelBg = Color(0x21E0796A), diffDelTx = Color(0xFFE6A99F), hunkBg = Color(0x177BA6D6),
-    sel = Color(0x24F0663C), glow = Color(0x59F0663C), hi = Color(0x0BFFFFFF),
-    isDark = true,
-)
+// Minimalist Utilitarian — warm monochrome canvas, charcoal ink, a single
+// near-black primary action, muted pastel semantics, no gradients. Light is the
+// primary surface; the dark variant inverts coherently (light ink on charcoal).
 
 val EmberLight = KodaColors(
-    bg = Color(0xFFF2F0EE), rail = Color(0xFFEDEAE6), surface = Color(0xFFFBFAF9), raised = Color(0xFFE9E5E2),
-    border = Color(0xFFDAD4D0), strong = Color(0xFFC7BFB9),
-    text = Color(0xFF241F1C), dim = Color(0xFF665D57), faint = Color(0xFFA79E98),
-    accent = Color(0xFFD24A22), accentSoft = Color(0xFFE0714A), onAccent = Color(0xFFFFFFFF),
-    ok = Color(0xFF84B369), danger = Color(0xFFE0796A), info = Color(0xFF7BA6D6),
-    synKeyword = Color(0xFF3F6A9A), synString = Color(0xFF4F7A34), synNumber = Color(0xFFA5702A),
-    synComment = Color(0xFFA79E98), synFn = Color(0xFFC05A30),
-    diffAddBg = Color(0x26609640), diffAddTx = Color(0xFF3F6A24),
-    diffDelBg = Color(0x21C8503C), diffDelTx = Color(0xFFA13C2C), hunkBg = Color(0x1A5A82B4),
-    sel = Color(0x1AD24A22), glow = Color(0x40D24A22), hi = Color(0xB3FFFFFF),
+    bg = Color(0xFFF7F6F3), rail = Color(0xFFFBFBFA), surface = Color(0xFFFFFFFF), raised = Color(0xFFF9F9F8),
+    border = Color(0xFFEAEAEA), strong = Color(0xFFE2E1DD),
+    text = Color(0xFF2F3437), dim = Color(0xFF787774), faint = Color(0xFF9B9A97),
+    // Primary action is near-black (not a bright accent); on-accent is white.
+    accent = Color(0xFF1A1A19), accentSoft = Color(0xFF333331), onAccent = Color(0xFFFFFFFF),
+    ok = Color(0xFF346538), danger = Color(0xFF9F2F2D), info = Color(0xFF1F6C9F),
+    synKeyword = Color(0xFF1F6C9F), synString = Color(0xFF346538), synNumber = Color(0xFF956400),
+    synComment = Color(0xFF9B9A97), synFn = Color(0xFF2F3437),
+    diffAddBg = Color(0xFFEDF3EC), diffAddTx = Color(0xFF346538),
+    diffDelBg = Color(0xFFFDEBEC), diffDelTx = Color(0xFF9F2F2D), hunkBg = Color(0xFFE1F3FE),
+    sel = Color(0x0F1A1A19), glow = Color(0x141A1A19), hi = Color(0x05000000),
     isDark = false,
 )
 
-val LocalKoda = staticCompositionLocalOf { EmberDark }
+val EmberDark = KodaColors(
+    bg = Color(0xFF191817), rail = Color(0xFF1E1D1B), surface = Color(0xFF242220), raised = Color(0xFF2B2926),
+    border = Color(0xFF34322F), strong = Color(0xFF46443F),
+    text = Color(0xFFECEAE5), dim = Color(0xFFA4A099), faint = Color(0xFF6E6A63),
+    // Inverted: primary action is near-white on dark, with dark ink on it.
+    accent = Color(0xFFECEAE5), accentSoft = Color(0xFFC9C6C0), onAccent = Color(0xFF191817),
+    ok = Color(0xFF82B082), danger = Color(0xFFD98C86), info = Color(0xFF7FA8D6),
+    synKeyword = Color(0xFF7FA8D6), synString = Color(0xFF8FBF8F), synNumber = Color(0xFFD9B47F),
+    synComment = Color(0xFF6E6A63), synFn = Color(0xFFECEAE5),
+    diffAddBg = Color(0x2482B082), diffAddTx = Color(0xFFA6D0A6),
+    diffDelBg = Color(0x24D98C86), diffDelTx = Color(0xFFE6ADA8), hunkBg = Color(0x1F7FA8D6),
+    sel = Color(0x14FFFFFF), glow = Color(0x1FFFFFFF), hi = Color(0x0BFFFFFF),
+    isDark = true,
+)
+
+val LocalKoda = staticCompositionLocalOf { EmberLight }
 
 private fun scheme(k: KodaColors): ColorScheme =
     (if (k.isDark) darkColorScheme() else lightColorScheme()).copy(

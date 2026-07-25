@@ -52,7 +52,7 @@ fun ConnectScreen(model: AppModel) {
         ) {
             // Header.
             Column(Modifier.fillMaxWidth().padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))))
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(k.accent))
                 Spacer(Modifier.size(14.dp))
                 Text("Connect to a daemon", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.17).sp, color = k.text)
                 Text(

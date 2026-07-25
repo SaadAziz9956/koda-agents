@@ -77,7 +77,7 @@ fun main(args: Array<String>) {
     render("panel-files", 344, 620, dark = false) { dev.koda.desktop.ui.FileExplorer(model) }
     render("panel-git", 344, 620, dark = false) { dev.koda.desktop.ui.GitPanel(model, Modifier.fillMaxSize()) }
     // Rail alone, high-DPI, for close inspection of the left panel.
-    render("rail", 224, 540, dark = true, density = 2f) {
+    render("rail", 224, 540, dark = false, density = 2f) {
         dev.koda.desktop.ui.Rail(model, AppView.Home, {}, Modifier.fillMaxSize())
     }
 

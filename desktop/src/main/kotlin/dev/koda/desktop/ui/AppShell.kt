@@ -156,7 +156,7 @@ private fun TopReviewNav(
         Modifier.fillMaxWidth().height(44.dp).background(k.rail).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(16.dp).clip(RoundedCornerShape(5.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))))
+        Box(Modifier.size(16.dp).clip(RoundedCornerShape(5.dp)).background(k.accent))
         Spacer(Modifier.width(9.dp))
         Text("Koda", fontSize = 13.5f.sp, fontWeight = FontWeight.SemiBold, color = k.text)
         Spacer(Modifier.width(9.dp))
@@ -265,7 +265,7 @@ private fun AuthBanner(model: AppModel) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Gradient logo tile with a key glyph, matching the Connect card.
                 Box(
-                    Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))),
+                    Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(k.accent),
                     contentAlignment = Alignment.Center,
                 ) { Text("⚿", fontSize = 17.sp, color = k.onAccent) }
                 Column(Modifier.weight(1f)) {
@@ -407,7 +407,7 @@ private fun UserAvatar() {
 private fun AgentAvatar() {
     val k = LocalKoda.current
     Box(
-        Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(Brush.linearGradient(listOf(k.accentSoft, k.accent))),
+        Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(k.accent),
         contentAlignment = Alignment.Center,
     ) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(3.dp)).background(k.onAccent.copy(alpha = 0.85f))) }
 }

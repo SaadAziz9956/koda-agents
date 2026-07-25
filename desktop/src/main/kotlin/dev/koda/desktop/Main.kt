@@ -34,7 +34,7 @@ fun main(): Unit = application {
     val model = remember { AppModel(DaemonClient(scope), scope) }
     var palette by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf(AppView.Connect) }
-    var dark by remember { mutableStateOf(true) }
+    var dark by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { model.connect(model.daemonUrl) }
     // Land on Home once the first connection succeeds.
