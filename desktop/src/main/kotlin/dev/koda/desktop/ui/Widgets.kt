@@ -97,6 +97,20 @@ fun blinkAlpha(): Float {
     return a
 }
 
+/**
+ * Blink via the draw phase: the animated alpha is read inside `graphicsLayer`
+ * (draw), so the node never recomposes — the Compose-perf "defer state reads
+ * to the latest phase" rule, instead of reading blinkAlpha() in composition.
+ */
+fun Modifier.blink(periodMs: Int = 650): Modifier = composed {
+    val t = rememberInfiniteTransition()
+    val a by t.animateFloat(
+        initialValue = 1f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(tween(periodMs), RepeatMode.Reverse),
+    )
+    graphicsLayer { alpha = a }
+}
+
 /** koda-up: fade in while rising a few px — the entrance for stream cards. */
 fun Modifier.enterUp(durationMs: Int = 280, riseDp: Float = 6f): Modifier = composed {
     val anim = remember { Animatable(0f) }

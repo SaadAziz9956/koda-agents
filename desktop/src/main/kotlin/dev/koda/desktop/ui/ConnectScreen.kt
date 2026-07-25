@@ -67,8 +67,7 @@ fun ConnectScreen(model: AppModel) {
                     .border(1.dp, k.strong, RoundedCornerShape(10.dp)).padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                val alpha = blinkAlpha()
-                Box(Modifier.size(7.dp).clip(RoundedCornerShape(3.5.dp)).background(k.accent.copy(alpha = alpha)))
+                Box(Modifier.size(7.dp).blink().clip(RoundedCornerShape(3.5.dp)).background(k.accent))
                 EmberField(url, { url = it }, "ws://127.0.0.1:4477", Modifier.weight(1f), mono = true, bordered = false, onSubmit = { model.connect(url) })
             }
             // Status row.

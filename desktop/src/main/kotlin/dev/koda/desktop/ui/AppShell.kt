@@ -473,10 +473,9 @@ private fun Sep() {
 @Composable
 private fun ActivityDot(running: Boolean) {
     val k = LocalKoda.current
-    val alpha = if (running) blinkAlpha() else 1f
     Box(
-        Modifier.size(7.dp).clip(RoundedCornerShape(50))
-            .background((if (running) k.accent else k.ok).copy(alpha = alpha)),
+        Modifier.size(7.dp).then(if (running) Modifier.blink() else Modifier)
+            .clip(RoundedCornerShape(50)).background(if (running) k.accent else k.ok),
     )
 }
 
