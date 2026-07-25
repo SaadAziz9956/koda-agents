@@ -93,8 +93,9 @@ fun AppShell(
             targetState = route,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             transitionSpec = {
-                (fadeIn(tween(240)) + scaleIn(tween(240), initialScale = 0.985f)) togetherWith
-                    (fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 1.01f)) using
+                // Physics on the movement (spring scale), tween on the fade.
+                (fadeIn(tween(220)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.985f)) togetherWith
+                    (fadeOut(tween(140)) + scaleOut(spring(stiffness = Spring.StiffnessMedium), targetScale = 1.01f)) using
                     SizeTransform(clip = false)
             },
             label = "route",

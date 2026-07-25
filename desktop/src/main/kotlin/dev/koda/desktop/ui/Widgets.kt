@@ -1,15 +1,24 @@
 package dev.koda.desktop.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -111,14 +120,53 @@ fun Modifier.blink(periodMs: Int = 650): Modifier = composed {
     graphicsLayer { alpha = a }
 }
 
-/** koda-up: fade in while rising a few px — the entrance for stream cards. */
-fun Modifier.enterUp(durationMs: Int = 280, riseDp: Float = 6f): Modifier = composed {
+/** koda-up: fade in while rising a few px — the entrance for stream cards.
+ *  [delayMs] staggers list items (pass index * step). */
+fun Modifier.enterUp(durationMs: Int = 280, riseDp: Float = 6f, delayMs: Int = 0): Modifier = composed {
     val anim = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { anim.animateTo(1f, tween(durationMs, easing = FastOutSlowInEasing)) }
+    // Stagger via the spec's delayMillis (frame-clock driven) — robust and never
+    // leaves an item stuck invisible if a dispatcher delay wouldn't fire.
+    LaunchedEffect(Unit) { anim.animateTo(1f, tween(durationMs, delayMillis = delayMs, easing = FastOutSlowInEasing)) }
     graphicsLayer {
         alpha = anim.value
         translationY = (1f - anim.value) * riseDp.dp.toPx()
     }
+}
+
+/**
+ * Press/hover spring scale + click, one shared interaction source. Scale is
+ * applied in graphicsLayer (draw phase). Physics, not flash — a springy dip on
+ * press and a slight lift on hover give instant, tactile feedback.
+ */
+fun Modifier.clickableScale(
+    pressScale: Float = 0.97f,
+    hoverScale: Float = 1.015f,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+): Modifier = composed {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val hovered by interaction.collectIsHoveredAsState()
+    val target = if (pressed) pressScale else if (hovered) hoverScale else 1f
+    val scale by animateFloatAsState(target, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow), label = "pressScale")
+    graphicsLayer { scaleX = scale; scaleY = scale }
+        .hoverable(interaction, enabled = enabled)
+        .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
+}
+
+/**
+ * Animated hover background tint for list rows — immediate feedback on every
+ * hover. Keeps its own hover source; pair with the row's own clickable.
+ */
+fun Modifier.hoverBg(
+    shape: androidx.compose.ui.graphics.Shape,
+    hoverColor: Color,
+    baseColor: Color = Color.Transparent,
+): Modifier = composed {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val bg by animateColorAsState(if (hovered) hoverColor else baseColor, tween(120), label = "hoverBg")
+    hoverable(interaction).clip(shape).background(bg)
 }
 
 /** koda-fade: a plain opacity fade-in, for settled content like the summary. */

@@ -13,7 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,8 +58,8 @@ fun Rail(model: AppModel, view: AppView, onSelectView: (AppView) -> Unit, modifi
             Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            items(model.sessions, key = { it.id }) { s ->
-                SessionRow(s.id, s.title ?: "${s.messageCount} messages", s.messageCount, active = s.id == model.sessionId) { model.resume(s.id) }
+            itemsIndexed(model.sessions, key = { _, s -> s.id }) { i, s ->
+                SessionRow(s.id, s.title ?: "${s.messageCount} messages", s.messageCount, active = s.id == model.sessionId, index = i) { model.resume(s.id) }
             }
         }
         HDivider()
@@ -66,10 +77,24 @@ fun Rail(model: AppModel, view: AppView, onSelectView: (AppView) -> Unit, modifi
 
 @Composable
 private fun ViewToggle(view: AppView, onSelect: (AppView) -> Unit) {
+    val pill = MaterialTheme.colorScheme.primary
+    // The active pill glides between the two halves with a spring — Linear-style.
+    val frac by animateFloatAsState(
+        if (view == AppView.Home) 0f else 1f,
+        spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow), label = "viewToggle",
+    )
     Row(
         Modifier.fillMaxWidth().padding(10.dp).clip(RoundedCornerShape(9.dp))
-            .background(MaterialTheme.colorScheme.background).padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+            .background(MaterialTheme.colorScheme.background).padding(3.dp)
+            .drawBehind {
+                val w = size.width / 2f
+                drawRoundRect(
+                    color = pill,
+                    topLeft = Offset(frac * w, 0f),
+                    size = Size(w, size.height),
+                    cornerRadius = CornerRadius(7.dp.toPx()),
+                )
+            },
     ) {
         ViewTab("Home", view == AppView.Home, Modifier.weight(1f)) { onSelect(AppView.Home) }
         ViewTab("Code", view == AppView.Code, Modifier.weight(1f)) { onSelect(AppView.Code) }
@@ -78,18 +103,16 @@ private fun ViewToggle(view: AppView, onSelect: (AppView) -> Unit) {
 
 @Composable
 private fun ViewTab(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    // No own background — the sliding pill is drawn behind the row.
+    val color by animateColorAsState(
+        if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        tween(180), label = "viewTabText",
+    )
     Box(
-        modifier.clip(RoundedCornerShape(7.dp))
-            .background(if (active) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable(onClick = onClick).padding(vertical = 7.dp),
+        modifier.clip(RoundedCornerShape(7.dp)).clickable(onClick = onClick).padding(vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            label,
-            fontSize = 12.5f.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(label, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = color)
     }
 }
 
@@ -100,11 +123,13 @@ private fun Eyebrow(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SessionRow(name: String, subtitle: String, count: Int, active: Boolean, onClick: () -> Unit) {
+private fun SessionRow(name: String, subtitle: String, count: Int, active: Boolean, index: Int, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
+    val base = if (active) MaterialTheme.colorScheme.background else androidx.compose.ui.graphics.Color.Transparent
     Row(
-        Modifier.fillMaxWidth().clip(shape)
-            .background(if (active) MaterialTheme.colorScheme.background else androidx.compose.ui.graphics.Color.Transparent)
+        Modifier.fillMaxWidth()
+            .enterUp(delayMs = index * 45)                       // staggered cascade
+            .hoverBg(shape, hoverColor = MaterialTheme.colorScheme.surface, baseColor = base)
             .clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 6.dp),
         verticalAlignment = Alignment.Top,
     ) {

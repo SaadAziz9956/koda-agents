@@ -2,8 +2,12 @@ package dev.koda.desktop.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,14 +48,22 @@ fun EmberField(
     onSubmit: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(11.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    // Focus glow: the border warms to the accent when the field is active.
+    val borderColor by animateColorAsState(
+        if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        tween(160), label = "focusBorder",
+    )
     val base = if (bordered) {
         modifier.clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape).padding(horizontal = 14.dp, vertical = 12.dp)
+            .border(1.dp, borderColor, shape).padding(horizontal = 14.dp, vertical = 12.dp)
     } else modifier.padding(horizontal = 4.dp, vertical = 10.dp)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = base,
+        interactionSource = interaction,
         singleLine = true,
         textStyle = TextStyle(
             color = MaterialTheme.colorScheme.onSurface,
@@ -78,9 +90,11 @@ fun EmberField(
 fun EmberButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val shape = RoundedCornerShape(9.dp)
     Box(
-        modifier.clip(shape)
+        modifier
+            .clickableScale(enabled = enabled, onClick = onClick)
+            .clip(shape)
             .background(if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 15.dp, vertical = 9.dp),
+            .padding(horizontal = 15.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -93,8 +107,10 @@ fun EmberGhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Mod
     val shape = RoundedCornerShape(9.dp)
     val fg = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
     Box(
-        modifier.clip(shape).border(1.dp, MaterialTheme.colorScheme.outline, shape)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
+        modifier
+            .clickableScale(onClick = onClick)
+            .clip(shape).border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = fg, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)

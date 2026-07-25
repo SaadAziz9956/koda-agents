@@ -1,5 +1,7 @@
 package dev.koda.desktop.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -130,42 +132,43 @@ fun CodeEditor(model: AppModel, modifier: Modifier = Modifier) {
             }
         }
         HDivider()
-        // ── Editor body ──
-        if (path == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Open a file from the Files panel →", fontSize = 13.sp, color = k.faint)
-            }
-        } else if (model.openFileError != null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(model.openFileError ?: "", fontSize = 13.sp, color = k.danger, fontFamily = JetBrainsMono)
-            }
-        } else {
-            val lines = model.openFileContent.split('\n')
-            // Mark lines the agent just changed, from the git diff for this file.
-            val changed = remember(model.gitDiff, model.gitDiffPath, path) {
-                if (model.gitDiffPath == path && model.gitDiff.isNotBlank()) changedLines(model.gitDiff) else emptySet()
-            }
-            val h = rememberScrollState()
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
-                Column(Modifier.horizontalScroll(h)) {
-                    lines.forEachIndexed { i, line ->
-                        val isChanged = changed.contains(i + 1)
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-                                .background(if (isChanged) k.diffAddBg else androidx.compose.ui.graphics.Color.Transparent),
-                        ) {
-                            Text(
-                                "${i + 1}", fontFamily = JetBrainsMono, fontSize = 12.5f.sp, color = k.faint,
-                                textAlign = TextAlign.End, modifier = Modifier.width(44.dp).padding(end = 16.dp),
-                            )
-                            Text(
-                                if (isChanged) "▸" else "", fontFamily = JetBrainsMono, fontSize = 11.sp, color = k.accent,
-                                textAlign = TextAlign.Center, modifier = Modifier.width(14.dp),
-                            )
-                            Text(
-                                highlight(line, k), fontFamily = JetBrainsMono, fontSize = 12.5f.sp,
-                                color = k.text, softWrap = false, lineHeight = 20.sp,
-                            )
+        // ── Editor body ── opening a file fades+lifts in (shared-element feel).
+        Crossfade(targetState = path, animationSpec = tween(240), label = "fileOpen", modifier = Modifier.fillMaxSize()) { p ->
+            if (p == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Open a file from the Files panel →", fontSize = 13.sp, color = k.faint)
+                }
+            } else if (model.openFileError != null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(model.openFileError ?: "", fontSize = 13.sp, color = k.danger, fontFamily = JetBrainsMono)
+                }
+            } else {
+                val lines = model.openFileContent.split('\n')
+                val changed = remember(model.gitDiff, model.gitDiffPath, p) {
+                    if (model.gitDiffPath == p && model.gitDiff.isNotBlank()) changedLines(model.gitDiff) else emptySet()
+                }
+                val h = rememberScrollState()
+                Column(Modifier.fillMaxSize().enterUp(riseDp = 4f).verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
+                    Column(Modifier.horizontalScroll(h)) {
+                        lines.forEachIndexed { i, line ->
+                            val isChanged = changed.contains(i + 1)
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                                    .background(if (isChanged) k.diffAddBg else androidx.compose.ui.graphics.Color.Transparent),
+                            ) {
+                                Text(
+                                    "${i + 1}", fontFamily = JetBrainsMono, fontSize = 12.5f.sp, color = k.faint,
+                                    textAlign = TextAlign.End, modifier = Modifier.width(44.dp).padding(end = 16.dp),
+                                )
+                                Text(
+                                    if (isChanged) "▸" else "", fontFamily = JetBrainsMono, fontSize = 11.sp, color = k.accent,
+                                    textAlign = TextAlign.Center, modifier = Modifier.width(14.dp),
+                                )
+                                Text(
+                                    highlight(line, k), fontFamily = JetBrainsMono, fontSize = 12.5f.sp,
+                                    color = k.text, softWrap = false, lineHeight = 20.sp,
+                                )
+                            }
                         }
                     }
                 }
