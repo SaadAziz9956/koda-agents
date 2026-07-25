@@ -1,5 +1,16 @@
 package dev.koda.desktop.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,10 +86,22 @@ fun AppShell(
     val k = LocalKoda.current
     Column(Modifier.fillMaxSize().background(k.bg)) {
         TopReviewNav(view, setView, onOpenPalette, dark, onToggleTheme)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (view) {
-                AppView.Connect -> ConnectScreen(model)
-                AppView.Settings -> SettingsScreen(model, dark = dark, onToggleTheme = onToggleTheme, onClose = { setView(AppView.Home) })
+        // Full-page route swaps (Main ↔ Connect ↔ Settings) cross-fade with a
+        // subtle scale; grouped so Home↔Code don't re-animate the whole shell.
+        val route = when (view) { AppView.Connect -> "connect"; AppView.Settings -> "settings"; else -> "main" }
+        AnimatedContent(
+            targetState = route,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                (fadeIn(tween(240)) + scaleIn(tween(240), initialScale = 0.985f)) togetherWith
+                    (fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 1.01f)) using
+                    SizeTransform(clip = false)
+            },
+            label = "route",
+        ) { r ->
+            when (r) {
+                "connect" -> ConnectScreen(model)
+                "settings" -> SettingsScreen(model, dark = dark, onToggleTheme = onToggleTheme, onClose = { setView(AppView.Home) })
                 else -> Row(Modifier.fillMaxSize()) {
                     Rail(model, view, setView, Modifier.width(224.dp).fillMaxHeight())
                     VDivider()
@@ -87,12 +110,29 @@ fun AppShell(
                         HDivider()
                         if (model.status != ConnStatus.Connected) ReconnectBanner(model)
                         if (model.everConnected && !model.authConfigured) AuthBanner(model)
-                        if (view == AppView.Code) {
-                            Box(Modifier.weight(1f).fillMaxWidth()) { CodeEditor(model) }
-                        } else {
-                            Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
-                            HDivider()
-                            Composer(model, onOpenSettings = { setView(AppView.Settings) })
+                        // Center content slides + fades between Home and Code while
+                        // the rail / top bar / right panel stay put.
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            AnimatedContent(
+                                targetState = view == AppView.Code,
+                                modifier = Modifier.fillMaxSize(),
+                                transitionSpec = {
+                                    val dir = if (targetState) 1 else -1
+                                    (slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { (it * 0.05f).toInt() * dir } + fadeIn(tween(200))) togetherWith
+                                        fadeOut(tween(130))
+                                },
+                                label = "center",
+                            ) { isCode ->
+                                if (isCode) {
+                                    CodeEditor(model)
+                                } else {
+                                    Column(Modifier.fillMaxSize()) {
+                                        Box(Modifier.weight(1f).fillMaxWidth()) { Transcript(model) }
+                                        HDivider()
+                                        Composer(model, onOpenSettings = { setView(AppView.Settings) })
+                                    }
+                                }
+                            }
                         }
                     }
                     // The right panel (Rewind/Files/Git) is present in both Home and Code.

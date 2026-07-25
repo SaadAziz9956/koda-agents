@@ -14,6 +14,8 @@ dependencies {
     implementation(project(":protocol"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
+    // Feather — open-source thin line icons for Compose Multiplatform.
+    implementation("br.com.devsrsouza.compose.icons:feather:1.1.1")
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.ktor.client.core)
